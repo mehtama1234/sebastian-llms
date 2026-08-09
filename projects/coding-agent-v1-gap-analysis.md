@@ -215,6 +215,10 @@ To move `coding-agent-v1` toward the flagship capstone, the next work should be:
 4. broaden feature-task support beyond the current CLI flag pattern
 5. strengthen long-session memory compaction and unresolved-question tracking
 
+The concrete brief for the immediate next milestone is:
+
+- `projects/coding-agent-v1-planner-and-eval-upgrade.md`
+
 ## What Not To Do Yet
 
 The highest-leverage next step is not:

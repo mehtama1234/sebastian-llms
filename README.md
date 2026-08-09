@@ -38,6 +38,7 @@ The best companion planning docs for that topic right now are:
 - `projects/coding-agent-v1-first-milestone-checklist.md`
 - `projects/coding-agent-v1-release-prep.md`
 - `projects/coding-agent-v1-commit-stack-plan.md`
+- `projects/coding-agent-v1-planner-and-eval-upgrade.md`
 - `projects/coding-agent-portfolio-roadmap.md`
 - `projects/coding-agent-flagship-capstone.md`
 - `projects/coding-agent-v1-gap-analysis.md`

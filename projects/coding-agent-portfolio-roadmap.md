@@ -147,6 +147,7 @@ Push `coding-agent-v1` from heuristic V1 behavior into a stronger planning and v
 - stronger planner inside `projects/coding-agent-v1/`
 - broader validation heuristics
 - better feature-task coverage
+- milestone brief in `projects/coding-agent-v1-planner-and-eval-upgrade.md`
 
 ### What It Shows In A Portfolio
 
