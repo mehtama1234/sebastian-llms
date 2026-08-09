@@ -27,23 +27,68 @@ def test_load_eval_scenario_pack_parses_core_catalog() -> None:
     assert all(scenario.failure_modes for scenario in pack.scenarios)
 
 
+def test_load_eval_scenario_pack_parses_smoke_catalog() -> None:
+    path = Path(__file__).resolve().parents[3] / "evals" / "coding-agent-v1" / "scenarios" / "smoke-v1.json"
+
+    pack = load_eval_scenario_pack(path)
+
+    assert pack.pack_id == "coding-agent-v1-smoke"
+    assert len(pack.scenarios) == 5
+    assert {scenario.task_class for scenario in pack.scenarios} == {
+        "fix",
+        "feature",
+        "rename",
+        "diagnose",
+        "resume",
+    }
+    assert {scenario.severity for scenario in pack.scenarios} == {"smoke"}
+    assert all(scenario.failure_modes for scenario in pack.scenarios)
+
+
+def test_load_eval_scenario_pack_parses_stress_catalog() -> None:
+    path = Path(__file__).resolve().parents[3] / "evals" / "coding-agent-v1" / "scenarios" / "stress-v1.json"
+
+    pack = load_eval_scenario_pack(path)
+
+    assert pack.pack_id == "coding-agent-v1-stress"
+    assert len(pack.scenarios) == 5
+    assert {scenario.task_class for scenario in pack.scenarios} == {
+        "fix",
+        "feature",
+        "rename",
+        "diagnose",
+        "resume",
+    }
+    assert {scenario.severity for scenario in pack.scenarios} == {"core"}
+    assert all(scenario.failure_modes for scenario in pack.scenarios)
+
+
 def test_list_executable_eval_scenarios_filters_to_runnable_subset() -> None:
     path = Path(__file__).resolve().parents[3] / "evals" / "coding-agent-v1" / "scenarios" / "core-v1.json"
 
     pack = load_eval_scenario_pack(path)
     executable = list_executable_eval_scenarios(pack)
 
-    assert len(executable) == 11
+    assert len(executable) == 20
     assert {scenario.setup_kind for scenario in executable} == {
         "repair",
+        "repair_nested_literal",
+        "repair_literal_regression_guard",
         "rename",
+        "rename_fixture_refs",
+        "rename_nested_package",
+        "rename_ambiguous_mentions",
         "cli_flag",
         "config_option",
         "env_var",
         "diagnose",
         "diagnose_multi_test",
         "approval_boundary",
+        "diagnose_repo_fallback",
         "resume_flow",
+        "resume_repair_flow",
+        "resume_diagnose_flow",
+        "resume_validation_reminder",
     }
 
 
@@ -80,6 +125,41 @@ def test_summarize_eval_scenario_pack_lists_counts() -> None:
     assert "task_classes:" in text
     assert "  fix: 4" in text
     assert "failure_modes:" in text
+
+
+def test_build_eval_scenario_pack_summary_counts_smoke_catalog() -> None:
+    path = Path(__file__).resolve().parents[3] / "evals" / "coding-agent-v1" / "scenarios" / "smoke-v1.json"
+    pack = load_eval_scenario_pack(path)
+
+    summary = build_eval_scenario_pack_summary(pack)
+
+    assert summary.scenario_count == 5
+    assert summary.task_class_counts == {
+        "diagnose": 1,
+        "feature": 1,
+        "fix": 1,
+        "rename": 1,
+        "resume": 1,
+    }
+    assert summary.severity_counts == {"smoke": 5}
+
+
+def test_build_eval_scenario_pack_summary_counts_stress_catalog() -> None:
+    path = Path(__file__).resolve().parents[3] / "evals" / "coding-agent-v1" / "scenarios" / "stress-v1.json"
+    pack = load_eval_scenario_pack(path)
+
+    summary = build_eval_scenario_pack_summary(pack)
+
+    assert summary.scenario_count == 5
+    assert summary.task_class_counts == {
+        "diagnose": 1,
+        "feature": 1,
+        "fix": 1,
+        "rename": 1,
+        "resume": 1,
+    }
+    assert summary.severity_counts == {"core": 5}
+    assert summary.failure_mode_counts["unsafe_action"] >= 2
 
 
 def test_load_eval_scenario_pack_rejects_invalid_task_class(tmp_path: Path) -> None:

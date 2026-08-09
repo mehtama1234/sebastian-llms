@@ -54,6 +54,9 @@ What exists now:
 - a repair loop for small failing-test cases
 - proposal scoring and evidence capture for suggested fixes
 - test coverage for the main harness behaviors
+- a runnable external smoke eval benchmark pack with 5 scenarios, one per core task class
+- a fully runnable external eval benchmark pack with 20 scenarios across fix, feature, rename, diagnose, and resume
+- a runnable external stress eval benchmark pack with 5 harder scenarios covering ambiguity, approval boundaries, regression risk, and resume continuity
 
 What still needs to be built next:
 
@@ -82,6 +85,9 @@ The current harness can already demonstrate:
 - review and resume saved sessions
 - carry a compact working-memory snapshot across resumed sessions
 - run a built-in fixed eval suite across task success, natural-language bug-intent routing, natural-language feature requests, approval gating, and resume flow
+- run the external `coding-agent-v1` smoke eval pack as a small external benchmark tier
+- run the external `coding-agent-v1` core eval pack as the default benchmark path
+- run the external `coding-agent-v1` stress eval pack as a focused harder benchmark tier
 - persist eval summaries as JSON artifacts with timestamps, labels, timing, and outcome reasons
 - list saved eval artifacts by date, label, and pass rate
 - resolve saved eval artifacts by label for compare and history workflows
@@ -93,6 +99,8 @@ The current harness can already demonstrate:
 - compare saved eval artifacts for regressions and improvements
 - persist comparison and auto-promotion decisions as JSON artifacts for later audit
 - summarize scenario trends across multiple eval artifacts
+- carry scenario pack ids through saved eval listings, history summaries, and comparisons
+- print task-class and failure-mode rollups for eval runs and task-class regression rollups for eval comparisons
 - rerun validation and summarize the final result
 
 As of Sunday, August 9, 2026, the local test suite passes with:
@@ -103,5 +111,83 @@ As of Sunday, August 9, 2026, the local test suite passes with:
 
 1. Add a real model-backed planner that improves on the current scored evidence-based rules.
 2. Expand the session model into resumable memory plus compact working summaries.
-3. Expand the eval harness into a broader benchmark set with regression checks across each task flow.
+3. Expand the eval harness beyond the current core external pack with more scenario packs and richer regression slicing across each task flow.
 4. Improve validation command selection beyond the current text-and-module matching rules.
+
+## Eval Commands
+
+From `projects/coding-agent-v1/`:
+
+```bash
+python -m coding_agent_v1.cli --session-dir .coding-agent-v1/sessions --run-evals
+```
+
+This now runs the external `coding-agent-v1` core benchmark pack by default.
+
+For the external smoke-tier pack:
+
+```bash
+python -m coding_agent_v1.cli --session-dir .coding-agent-v1/sessions --run-eval-pack ../../evals/coding-agent-v1/scenarios/smoke-v1.json
+```
+
+For the external stress-tier pack:
+
+```bash
+python -m coding_agent_v1.cli --session-dir .coding-agent-v1/sessions --run-eval-pack ../../evals/coding-agent-v1/scenarios/stress-v1.json
+```
+
+For the older built-in smoke suite:
+
+```bash
+python -m coding_agent_v1.cli --session-dir .coding-agent-v1/sessions --run-smoke-evals
+```
+
+Saved eval references now support pack-aware aliases as well, so comparisons and history queries can target benchmark tiers directly:
+
+```bash
+python -m coding_agent_v1.cli --session-dir .coding-agent-v1/sessions --compare-evals latest-pass:core latest-pass:stress
+python -m coding_agent_v1.cli --session-dir .coding-agent-v1/sessions --history-evals latest:built-in latest:smoke latest:stress
+```
+
+For direct filtering on saved artifact listings and history views:
+
+```bash
+python -m coding_agent_v1.cli --session-dir .coding-agent-v1/sessions --list-evals --eval-pack-filter smoke
+python -m coding_agent_v1.cli --session-dir .coding-agent-v1/sessions --history-evals latest:built-in latest:smoke latest:stress --eval-pack-filter stress
+```
+
+Named baselines can also be pack-scoped on resolution:
+
+```bash
+python -m coding_agent_v1.cli --session-dir .coding-agent-v1/sessions --compare-evals baseline:main:core latest-pass:core
+```
+
+And for `--compare-eval-baseline` or `--auto-promote-eval-baseline`, the default `latest-pass` candidate now stays within the saved baseline's scenario pack when that baseline already points at a known pack tier.
+
+`--list-eval-baselines` also now surfaces baseline status, scenario pack id, run label, and pass metadata, and it marks missing artifact targets explicitly.
+
+Missing baseline targets can also be repaired directly:
+
+```bash
+python -m coding_agent_v1.cli --session-dir .coding-agent-v1/sessions --repair-eval-baseline main
+python -m coding_agent_v1.cli --session-dir .coding-agent-v1/sessions --repair-eval-baseline main latest-pass:stress
+```
+
+If no explicit repair reference is provided, the command defaults to `latest-pass` within the saved baseline's own scenario pack when that metadata is available.
+
+For a read-only baseline drift scan:
+
+```bash
+python -m coding_agent_v1.cli --session-dir .coding-agent-v1/sessions --audit-eval-baselines
+```
+
+The audit reports whether each baseline is `current`, `stale`, `missing`, or `missing-no-candidate`, and when available it prints the recommended same-pack `latest-pass:<pack>` reference and artifact path.
+
+For safe eval-summary retention cleanup:
+
+```bash
+python -m coding_agent_v1.cli --session-dir .coding-agent-v1/sessions --prune-evals
+python -m coding_agent_v1.cli --session-dir .coding-agent-v1/sessions --prune-evals --prune-evals-apply
+```
+
+The prune flow is dry-run by default. It currently prunes only `eval-summary-*.json` artifacts, while protecting named baseline targets and keeping the newest and newest-passing artifacts per pack based on `--prune-keep-per-pack`.

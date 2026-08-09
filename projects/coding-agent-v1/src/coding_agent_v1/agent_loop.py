@@ -37,9 +37,11 @@ from .planner import (
     find_config_mapping_files,
     find_python_test_paths,
     fix_reason,
+    inspect_reason,
     looks_like_diagnose_request,
     looks_like_failure_report_request,
     looks_like_fix_request,
+    looks_like_inspect_request,
     looks_like_test_failure_context,
     rename_reason,
     select_task_flow_from_candidates,
@@ -217,6 +219,7 @@ def build_task_plan(
     task_flow, flow_reasons, feature_strategy, feature_arguments, strategy_reason = _select_task_flow(
         request,
         workspace_root,
+        instruction_files,
     )
     reasons = list(flow_reasons)
     if task_flow is TaskFlow.FEATURE:
@@ -347,6 +350,7 @@ def _validation_reason(
 def _select_task_flow(
     request: str,
     workspace_root: Path,
+    instruction_files: list[str],
 ) -> tuple[TaskFlow, list[str], str, dict[str, str], str]:
     lowered = request.lower()
     feature_strategy, feature_arguments, strategy_reason = select_feature_strategy(request, workspace_root)
@@ -430,6 +434,18 @@ def _select_task_flow(
             score=diagnose_score,
             priority=4,
             reason=failure_report_reason(referenced_tests),
+        )
+
+    if looks_like_inspect_request(lowered):
+        inspect_score = 6
+        if instruction_files:
+            inspect_score += 1
+        append_task_flow_candidate(
+            scored_candidates,
+            task_flow=TaskFlow.INSPECT,
+            score=inspect_score,
+            priority=5,
+            reason=inspect_reason(instruction_files),
         )
 
     task_flow, reasons = select_task_flow_from_candidates(scored_candidates)
@@ -1297,6 +1313,7 @@ def run_session(
     prior_record: SessionRecord | None = None
     if resume_from_session_id is not None:
         prior_record = store.load(resume_from_session_id)
+        _inherit_resume_validation_command(request, task_plan, prior_record)
     record = SessionRecord(
         session_id=uuid4().hex,
         request=request,
@@ -1624,3 +1641,24 @@ def run_session(
         record.status = SessionStatus.COMPLETED
     store.save(record)
     return record
+
+
+def _inherit_resume_validation_command(
+    request: str,
+    task_plan: TaskPlan,
+    prior_record: SessionRecord,
+) -> None:
+    lowered = request.lower()
+    if "continue" not in lowered and "pick up" not in lowered:
+        return
+    if "rerun" not in lowered and "test" not in lowered:
+        return
+    prior_validation = prior_record.task_plan.validation_command if prior_record.task_plan is not None else ""
+    if not prior_validation or prior_validation == "pytest -q":
+        return
+    if task_plan.validation_command == prior_validation:
+        return
+    task_plan.validation_command = prior_validation
+    reason = f"selected validation command `{prior_validation}` from resumed session validation context"
+    if reason not in task_plan.reasons:
+        task_plan.reasons.append(reason)

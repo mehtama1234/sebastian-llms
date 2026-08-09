@@ -744,6 +744,20 @@ def test_build_task_plan_reports_full_suite_fallback_for_run_tests_request(tmp_p
     ) in " ".join(plan.reasons)
 
 
+def test_build_task_plan_scores_repo_summary_request_into_inspect_flow(tmp_path: Path) -> None:
+    (tmp_path / "README.md").write_text("project intro", encoding="utf-8")
+
+    plan = build_task_plan("summarize this repo", tmp_path, ["README.md"])
+
+    assert plan.task_flow is TaskFlow.INSPECT
+    assert plan.validation_command == ""
+    assert "planner selected `inspect` from scored task-flow candidates" in " ".join(plan.reasons)
+    assert (
+        "inspect evidence: request asks for repo inspection and README.md is available for context"
+        in " ".join(plan.reasons)
+    )
+
+
 def test_run_session_reads_repo_instructions(tmp_path: Path) -> None:
     (tmp_path / "README.md").write_text("project intro", encoding="utf-8")
     store = SessionStore(tmp_path / "sessions")

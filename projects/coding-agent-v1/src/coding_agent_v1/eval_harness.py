@@ -71,6 +71,8 @@ class EvalComparisonResult:
 class EvalComparisonSummary:
     baseline_artifact_path: Path | None
     candidate_artifact_path: Path | None
+    baseline_scenario_pack_id: str | None
+    candidate_scenario_pack_id: str | None
     regressions: int
     improvements: int
     unchanged: int
@@ -96,6 +98,7 @@ class EvalHistoryEntry:
     artifact_path: Path | None
     created_at: str | None
     run_label: str | None
+    scenario_pack_id: str | None
     passed: bool
     duration_seconds: float
     outcome_reason: str
@@ -117,6 +120,7 @@ class EvalScenarioTrend:
 @dataclass(slots=True)
 class EvalHistorySummary:
     artifact_paths: list[Path]
+    pack_counts: dict[str, int]
     scenario_trends: list[EvalScenarioTrend]
 
 
@@ -125,6 +129,7 @@ class EvalArtifactIndexEntry:
     artifact_path: Path
     created_at: str
     run_label: str | None
+    scenario_pack_id: str | None
     passed: int
     total: int
     pass_rate: float
@@ -133,6 +138,7 @@ class EvalArtifactIndexEntry:
 @dataclass(slots=True)
 class EvalArtifactIndex:
     artifact_dir: Path
+    pack_counts: dict[str, int]
     entries: list[EvalArtifactIndexEntry]
 
 
@@ -140,6 +146,72 @@ class EvalArtifactIndex:
 class EvalBaselineConfig:
     artifact_dir: Path
     baselines: dict[str, Path]
+    baseline_pack_ids: dict[str, str | None]
+
+
+@dataclass(slots=True)
+class EvalBaselineSummaryEntry:
+    name: str
+    artifact_path: Path
+    status: str
+    scenario_pack_id: str | None
+    run_label: str | None
+    created_at: str | None
+    passed: int | None
+    total: int | None
+    pass_rate: float | None
+
+
+@dataclass(slots=True)
+class EvalBaselineAuditEntry:
+    name: str
+    artifact_path: Path
+    status: str
+    scenario_pack_id: str | None
+    recommended_reference: str | None
+    recommended_artifact_path: Path | None
+
+
+@dataclass(slots=True)
+class EvalBaselineAuditSummary:
+    artifact_dir: Path
+    entries: list[EvalBaselineAuditEntry]
+
+
+@dataclass(slots=True)
+class EvalArtifactPruneEntry:
+    artifact_path: Path
+    action: str
+    reasons: tuple[str, ...]
+    scenario_pack_id: str | None
+    run_label: str | None
+
+
+@dataclass(slots=True)
+class EvalArtifactPruneSummary:
+    artifact_dir: Path
+    keep_per_pack: int
+    protected_count: int
+    prunable_count: int
+    entries: list[EvalArtifactPruneEntry]
+
+
+@dataclass(slots=True)
+class EvalDecisionArtifactPruneEntry:
+    artifact_path: Path
+    artifact_kind: str
+    action: str
+    reasons: tuple[str, ...]
+    referenced_artifact_paths: tuple[Path, ...]
+
+
+@dataclass(slots=True)
+class EvalDecisionArtifactPruneSummary:
+    artifact_dir: Path
+    keep_per_kind: int
+    protected_count: int
+    prunable_count: int
+    entries: list[EvalDecisionArtifactPruneEntry]
 
 
 @dataclass(slots=True)
@@ -281,6 +353,15 @@ SCENARIOS = [
         severity="core",
         failure_modes=("partial_fix", "regression_introduced", "bad_validation_scope"),
         tags=("env-var", "natural-language", "feature"),
+    ),
+    EvalScenario(
+        name="inspect_repo_summary",
+        request="summarize this repo",
+        setup_kind="inspect",
+        task_class="inspect",
+        severity="smoke",
+        failure_modes=("wrong_file_touched", "no_op", "bad_validation_scope"),
+        tags=("inspect", "summary", "no-edit"),
     ),
     EvalScenario(
         name="approval_required_boundary",
@@ -543,6 +624,8 @@ def compare_eval_summaries(
     return EvalComparisonSummary(
         baseline_artifact_path=baseline.artifact_path,
         candidate_artifact_path=candidate.artifact_path,
+        baseline_scenario_pack_id=baseline.scenario_pack_id,
+        candidate_scenario_pack_id=candidate.scenario_pack_id,
         regressions=regressions,
         improvements=improvements,
         unchanged=unchanged,
@@ -558,8 +641,11 @@ def compare_eval_baseline_to_reference(
     candidate_reference: str = "latest-pass",
 ) -> EvalComparisonSummary:
     baseline_path = resolve_eval_artifact_reference(f"baseline:{baseline_name}", artifact_dir)
-    candidate_path = resolve_eval_artifact_reference(candidate_reference, artifact_dir)
     baseline = load_eval_summary(baseline_path)
+    candidate_path = resolve_eval_artifact_reference(
+        _default_candidate_reference_for_baseline(baseline, candidate_reference),
+        artifact_dir,
+    )
     candidate = load_eval_summary(candidate_path)
     return compare_eval_summaries(baseline, candidate)
 
@@ -570,10 +656,13 @@ def auto_promote_eval_baseline(
     *,
     candidate_reference: str = "latest-pass",
 ) -> EvalPromotionDecision:
+    baseline_path = resolve_eval_artifact_reference(f"baseline:{baseline_name}", artifact_dir)
+    baseline = load_eval_summary(baseline_path)
+    effective_candidate_reference = _default_candidate_reference_for_baseline(baseline, candidate_reference)
     comparison = compare_eval_baseline_to_reference(
         artifact_dir,
         baseline_name,
-        candidate_reference=candidate_reference,
+        candidate_reference=effective_candidate_reference,
     )
     if comparison.regressions > 0:
         return EvalPromotionDecision(
@@ -587,7 +676,7 @@ def auto_promote_eval_baseline(
     artifact_path, config_path = promote_eval_baseline(
         artifact_dir,
         baseline_name,
-        reference=candidate_reference,
+        reference=effective_candidate_reference,
     )
     return EvalPromotionDecision(
         baseline_name=baseline_name,
@@ -607,6 +696,10 @@ def summarize_eval_comparison(summary: EvalComparisonSummary) -> str:
         f"unchanged: {summary.unchanged}",
         f"created_at: {summary.created_at}",
     ]
+    if summary.baseline_scenario_pack_id is not None:
+        lines.append(f"baseline_scenario_pack_id: {summary.baseline_scenario_pack_id}")
+    if summary.candidate_scenario_pack_id is not None:
+        lines.append(f"candidate_scenario_pack_id: {summary.candidate_scenario_pack_id}")
     if summary.artifact_path is not None:
         lines.append(f"artifact_path: {summary.artifact_path}")
     if summary.baseline_artifact_path is not None:
@@ -666,6 +759,10 @@ def summarize_eval_history(summary: EvalHistorySummary) -> str:
     lines = [f"artifacts: {len(summary.artifact_paths)}"]
     for path in summary.artifact_paths:
         lines.append(f"artifact_path: {path}")
+    if summary.pack_counts:
+        lines.append("scenario_packs:")
+        for pack_id in sorted(summary.pack_counts):
+            lines.append(f"  {pack_id}: {summary.pack_counts[pack_id]}")
     for trend in summary.scenario_trends:
         latest_entry = trend.history[-1]
         lines.append(
@@ -674,7 +771,8 @@ def summarize_eval_history(summary: EvalHistorySummary) -> str:
                 f"fail_count={trend.fail_count} latest_passed={trend.latest_passed} "
                 f"latest_duration_seconds={trend.latest_duration_seconds} "
                 f"average_duration_seconds={trend.average_duration_seconds} trend={trend.trend} "
-                f"latest_created_at={latest_entry.created_at} latest_run_label={latest_entry.run_label}"
+                f"latest_created_at={latest_entry.created_at} latest_run_label={latest_entry.run_label} "
+                f"latest_scenario_pack_id={latest_entry.scenario_pack_id}"
             )
         )
     return "\n".join(lines)
@@ -682,22 +780,26 @@ def summarize_eval_history(summary: EvalHistorySummary) -> str:
 
 def build_eval_artifact_index(artifact_dir: Path) -> EvalArtifactIndex:
     entries: list[EvalArtifactIndexEntry] = []
+    pack_counts: dict[str, int] = {}
     for path in sorted(artifact_dir.glob("eval-summary-*.json")):
         summary = load_eval_summary(path)
         total = summary.total
         pass_rate = round((summary.passed / total) * 100, 2) if total else 0.0
+        pack_id = summary.scenario_pack_id or "unknown"
+        pack_counts[pack_id] = pack_counts.get(pack_id, 0) + 1
         entries.append(
             EvalArtifactIndexEntry(
                 artifact_path=path,
                 created_at=summary.created_at,
                 run_label=summary.run_label,
+                scenario_pack_id=summary.scenario_pack_id,
                 passed=summary.passed,
                 total=summary.total,
                 pass_rate=pass_rate,
             )
         )
     entries.sort(key=lambda entry: entry.created_at, reverse=True)
-    return EvalArtifactIndex(artifact_dir=artifact_dir, entries=entries)
+    return EvalArtifactIndex(artifact_dir=artifact_dir, pack_counts=pack_counts, entries=entries)
 
 
 def summarize_eval_artifact_index(index: EvalArtifactIndex) -> str:
@@ -705,36 +807,72 @@ def summarize_eval_artifact_index(index: EvalArtifactIndex) -> str:
         f"artifact_dir: {index.artifact_dir}",
         f"artifacts: {len(index.entries)}",
     ]
+    if index.pack_counts:
+        lines.append("scenario_packs:")
+        for pack_id in sorted(index.pack_counts):
+            lines.append(f"  {pack_id}: {index.pack_counts[pack_id]}")
     for entry in index.entries:
         lines.append(
             (
                 f"{entry.artifact_path.name}: created_at={entry.created_at} "
-                f"run_label={entry.run_label} passed={entry.passed}/{entry.total} "
+                f"run_label={entry.run_label} scenario_pack_id={entry.scenario_pack_id} "
+                f"passed={entry.passed}/{entry.total} "
                 f"pass_rate={entry.pass_rate}%"
             )
         )
     return "\n".join(lines)
 
 
+def filter_eval_artifact_index(index: EvalArtifactIndex, selectors: list[str]) -> EvalArtifactIndex:
+    allowed_pack_ids = _resolve_scenario_pack_selectors(selectors, index.pack_counts.keys())
+    entries = [entry for entry in index.entries if (entry.scenario_pack_id or "unknown") in allowed_pack_ids]
+    pack_counts: dict[str, int] = {}
+    for entry in entries:
+        pack_id = entry.scenario_pack_id or "unknown"
+        pack_counts[pack_id] = pack_counts.get(pack_id, 0) + 1
+    return EvalArtifactIndex(
+        artifact_dir=index.artifact_dir,
+        pack_counts=pack_counts,
+        entries=entries,
+    )
+
+
 def load_eval_baseline_config(artifact_dir: Path) -> EvalBaselineConfig:
     path = _baseline_config_path(artifact_dir)
     if not path.exists():
-        return EvalBaselineConfig(artifact_dir=artifact_dir, baselines={})
+        return EvalBaselineConfig(artifact_dir=artifact_dir, baselines={}, baseline_pack_ids={})
     payload = json.loads(path.read_text(encoding="utf-8"))
     baselines = {name: Path(value) for name, value in payload.get("baselines", {}).items()}
-    return EvalBaselineConfig(artifact_dir=artifact_dir, baselines=baselines)
+    baseline_pack_ids = {
+        name: value
+        for name, value in payload.get("baseline_pack_ids", {}).items()
+    }
+    return EvalBaselineConfig(
+        artifact_dir=artifact_dir,
+        baselines=baselines,
+        baseline_pack_ids=baseline_pack_ids,
+    )
 
 
 def save_eval_baseline_reference(artifact_dir: Path, name: str, artifact_path: Path) -> Path:
     config = load_eval_baseline_config(artifact_dir)
     config.baselines[name] = artifact_path
+    if artifact_path.exists():
+        config.baseline_pack_ids[name] = load_eval_summary(artifact_path).scenario_pack_id
+    elif name not in config.baseline_pack_ids:
+        config.baseline_pack_ids[name] = None
     path = _baseline_config_path(artifact_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "baselines": {
             baseline_name: str(baseline_path)
             for baseline_name, baseline_path in sorted(config.baselines.items())
-        }
+        },
+        "baseline_pack_ids": {
+            baseline_name: baseline_pack_id
+            for baseline_name, baseline_pack_id in sorted(config.baseline_pack_ids.items())
+            if baseline_pack_id is not None
+        },
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return path
@@ -751,14 +889,331 @@ def promote_eval_baseline(
     return artifact_path, config_path
 
 
+def repair_eval_baseline_reference(
+    artifact_dir: Path,
+    name: str,
+    *,
+    reference: str | None = None,
+) -> tuple[Path, Path, str]:
+    config = load_eval_baseline_config(artifact_dir)
+    existing_path = config.baselines.get(name)
+    if existing_path is None:
+        raise ValueError(f"No named baseline found: {name}")
+    resolved_reference = reference
+    if resolved_reference is None:
+        baseline_pack_id = config.baseline_pack_ids.get(name)
+        if baseline_pack_id is not None:
+            resolved_reference = f"latest-pass:{baseline_pack_id}"
+        else:
+            resolved_reference = "latest-pass"
+    artifact_path = resolve_eval_artifact_reference(resolved_reference, artifact_dir)
+    config_path = save_eval_baseline_reference(artifact_dir, name, artifact_path)
+    return artifact_path, config_path, resolved_reference
+
+
 def summarize_eval_baseline_config(config: EvalBaselineConfig) -> str:
     lines = [
         f"artifact_dir: {config.artifact_dir}",
         f"baselines: {len(config.baselines)}",
     ]
-    for name, path in sorted(config.baselines.items()):
-        lines.append(f"{name}: {path}")
+    for entry in build_eval_baseline_summary_entries(config):
+        line = f"{entry.name}: {entry.artifact_path} status={entry.status}"
+        if entry.scenario_pack_id is not None:
+            line += f" scenario_pack_id={entry.scenario_pack_id}"
+        if entry.run_label is not None:
+            line += f" run_label={entry.run_label}"
+        if entry.created_at is not None:
+            line += f" created_at={entry.created_at}"
+        if entry.passed is not None and entry.total is not None and entry.pass_rate is not None:
+            line += f" passed={entry.passed}/{entry.total} pass_rate={entry.pass_rate}%"
+        lines.append(line)
     return "\n".join(lines)
+
+
+def build_eval_baseline_summary_entries(config: EvalBaselineConfig) -> list[EvalBaselineSummaryEntry]:
+    entries: list[EvalBaselineSummaryEntry] = []
+    for name, path in sorted(config.baselines.items()):
+        if not path.exists():
+            entries.append(
+                EvalBaselineSummaryEntry(
+                    name=name,
+                    artifact_path=path,
+                    status="missing",
+                    scenario_pack_id=config.baseline_pack_ids.get(name),
+                    run_label=None,
+                    created_at=None,
+                    passed=None,
+                    total=None,
+                    pass_rate=None,
+                )
+            )
+            continue
+        summary = load_eval_summary(path)
+        total = summary.total
+        pass_rate = round((summary.passed / total) * 100, 2) if total else 0.0
+        entries.append(
+            EvalBaselineSummaryEntry(
+                name=name,
+                artifact_path=path,
+                status="ok",
+                scenario_pack_id=summary.scenario_pack_id,
+                run_label=summary.run_label,
+                created_at=summary.created_at,
+                passed=summary.passed,
+                total=summary.total,
+                pass_rate=pass_rate,
+            )
+        )
+    return entries
+
+
+def build_eval_baseline_audit_summary(config: EvalBaselineConfig) -> EvalBaselineAuditSummary:
+    entries: list[EvalBaselineAuditEntry] = []
+    for name, path in sorted(config.baselines.items()):
+        stored_pack_id = config.baseline_pack_ids.get(name)
+        scenario_pack_id = stored_pack_id
+        if path.exists():
+            scenario_pack_id = load_eval_summary(path).scenario_pack_id
+        recommended_reference = None
+        recommended_artifact_path = None
+        if scenario_pack_id is not None:
+            recommended_reference = f"latest-pass:{scenario_pack_id}"
+            try:
+                recommended_artifact_path = resolve_eval_artifact_reference(recommended_reference, config.artifact_dir)
+            except ValueError:
+                recommended_artifact_path = None
+        else:
+            recommended_reference = "latest-pass"
+            try:
+                recommended_artifact_path = resolve_eval_artifact_reference(recommended_reference, config.artifact_dir)
+            except ValueError:
+                recommended_artifact_path = None
+
+        if not path.exists():
+            status = "missing" if recommended_artifact_path is not None else "missing-no-candidate"
+        elif recommended_artifact_path is None:
+            status = "no-candidate"
+        elif path == recommended_artifact_path:
+            status = "current"
+        else:
+            status = "stale"
+
+        entries.append(
+            EvalBaselineAuditEntry(
+                name=name,
+                artifact_path=path,
+                status=status,
+                scenario_pack_id=scenario_pack_id,
+                recommended_reference=recommended_reference,
+                recommended_artifact_path=recommended_artifact_path,
+            )
+        )
+    return EvalBaselineAuditSummary(artifact_dir=config.artifact_dir, entries=entries)
+
+
+def summarize_eval_baseline_audit(summary: EvalBaselineAuditSummary) -> str:
+    lines = [
+        f"artifact_dir: {summary.artifact_dir}",
+        f"baselines: {len(summary.entries)}",
+    ]
+    for entry in summary.entries:
+        line = f"{entry.name}: {entry.artifact_path} status={entry.status}"
+        if entry.scenario_pack_id is not None:
+            line += f" scenario_pack_id={entry.scenario_pack_id}"
+        if entry.recommended_reference is not None:
+            line += f" recommended_reference={entry.recommended_reference}"
+        if entry.recommended_artifact_path is not None:
+            line += f" recommended_artifact_path={entry.recommended_artifact_path}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def build_eval_artifact_prune_summary(
+    artifact_dir: Path,
+    *,
+    keep_per_pack: int = 1,
+) -> EvalArtifactPruneSummary:
+    index = build_eval_artifact_index(artifact_dir)
+    config = load_eval_baseline_config(artifact_dir)
+    protected_reasons_by_path: dict[Path, list[str]] = {}
+
+    for name, path in sorted(config.baselines.items()):
+        if path.exists():
+            protected_reasons_by_path.setdefault(path, []).append(f"named-baseline:{name}")
+
+    per_pack_entries: dict[str, list[EvalArtifactIndexEntry]] = {}
+    for entry in index.entries:
+        pack_id = entry.scenario_pack_id or "unknown"
+        per_pack_entries.setdefault(pack_id, []).append(entry)
+
+    for pack_id, entries in per_pack_entries.items():
+        for position, entry in enumerate(entries[:keep_per_pack], start=1):
+            protected_reasons_by_path.setdefault(entry.artifact_path, []).append(
+                f"latest-pack:{pack_id}:{position}"
+            )
+        passing_entries = [entry for entry in entries if entry.passed == entry.total]
+        for position, entry in enumerate(passing_entries[:keep_per_pack], start=1):
+            protected_reasons_by_path.setdefault(entry.artifact_path, []).append(
+                f"latest-pass-pack:{pack_id}:{position}"
+            )
+
+    summary_entries: list[EvalArtifactPruneEntry] = []
+    protected_count = 0
+    prunable_count = 0
+    for entry in index.entries:
+        reasons = tuple(protected_reasons_by_path.get(entry.artifact_path, ()))
+        if reasons:
+            action = "protect"
+            protected_count += 1
+        else:
+            action = "prune"
+            prunable_count += 1
+        summary_entries.append(
+            EvalArtifactPruneEntry(
+                artifact_path=entry.artifact_path,
+                action=action,
+                reasons=reasons,
+                scenario_pack_id=entry.scenario_pack_id,
+                run_label=entry.run_label,
+            )
+        )
+
+    return EvalArtifactPruneSummary(
+        artifact_dir=artifact_dir,
+        keep_per_pack=keep_per_pack,
+        protected_count=protected_count,
+        prunable_count=prunable_count,
+        entries=summary_entries,
+    )
+
+
+def summarize_eval_artifact_prune_summary(summary: EvalArtifactPruneSummary) -> str:
+    lines = [
+        f"artifact_dir: {summary.artifact_dir}",
+        f"keep_per_pack: {summary.keep_per_pack}",
+        f"protected: {summary.protected_count}",
+        f"prunable: {summary.prunable_count}",
+    ]
+    for entry in summary.entries:
+        line = f"{entry.artifact_path.name}: action={entry.action}"
+        if entry.scenario_pack_id is not None:
+            line += f" scenario_pack_id={entry.scenario_pack_id}"
+        if entry.run_label is not None:
+            line += f" run_label={entry.run_label}"
+        if entry.reasons:
+            line += f" reasons={','.join(entry.reasons)}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def apply_eval_artifact_prune_summary(summary: EvalArtifactPruneSummary) -> list[Path]:
+    deleted_paths: list[Path] = []
+    for entry in summary.entries:
+        if entry.action != "prune":
+            continue
+        if entry.artifact_path.exists():
+            entry.artifact_path.unlink()
+            deleted_paths.append(entry.artifact_path)
+    return deleted_paths
+
+
+def build_eval_decision_artifact_prune_summary(
+    artifact_dir: Path,
+    *,
+    keep_per_kind: int = 1,
+    keep_per_pack: int = 1,
+) -> EvalDecisionArtifactPruneSummary:
+    decision_artifact_dir = artifact_dir / "decision-artifacts"
+    eval_prune_summary = build_eval_artifact_prune_summary(artifact_dir, keep_per_pack=keep_per_pack)
+    protected_eval_paths = {
+        entry.artifact_path
+        for entry in eval_prune_summary.entries
+        if entry.action == "protect"
+    }
+
+    decision_entries: list[tuple[str, Path, tuple[Path, ...]]] = []
+    for artifact_kind, pattern in (
+        ("comparison", "eval-comparison-*.json"),
+        ("promotion", "eval-promotion-*.json"),
+    ):
+        for path in sorted(decision_artifact_dir.glob(pattern)):
+            decision_entries.append(
+                (artifact_kind, path, _extract_referenced_eval_artifact_paths(path))
+            )
+
+    decision_entries.sort(key=lambda item: item[1].name, reverse=True)
+
+    protected_reasons_by_path: dict[Path, list[str]] = {}
+    by_kind: dict[str, list[Path]] = {}
+    for artifact_kind, path, _ in decision_entries:
+        by_kind.setdefault(artifact_kind, []).append(path)
+    for artifact_kind, paths in by_kind.items():
+        for position, path in enumerate(paths[:keep_per_kind], start=1):
+            protected_reasons_by_path.setdefault(path, []).append(f"latest-kind:{artifact_kind}:{position}")
+
+    for artifact_kind, path, referenced_paths in decision_entries:
+        matched = [ref for ref in referenced_paths if ref in protected_eval_paths]
+        if matched:
+            protected_reasons_by_path.setdefault(path, []).append(
+                "references-protected-eval"
+            )
+
+    summary_entries: list[EvalDecisionArtifactPruneEntry] = []
+    protected_count = 0
+    prunable_count = 0
+    for artifact_kind, path, referenced_paths in decision_entries:
+        reasons = tuple(protected_reasons_by_path.get(path, ()))
+        if reasons:
+            action = "protect"
+            protected_count += 1
+        else:
+            action = "prune"
+            prunable_count += 1
+        summary_entries.append(
+            EvalDecisionArtifactPruneEntry(
+                artifact_path=path,
+                artifact_kind=artifact_kind,
+                action=action,
+                reasons=reasons,
+                referenced_artifact_paths=referenced_paths,
+            )
+        )
+
+    return EvalDecisionArtifactPruneSummary(
+        artifact_dir=decision_artifact_dir,
+        keep_per_kind=keep_per_kind,
+        protected_count=protected_count,
+        prunable_count=prunable_count,
+        entries=summary_entries,
+    )
+
+
+def summarize_eval_decision_artifact_prune_summary(summary: EvalDecisionArtifactPruneSummary) -> str:
+    lines = [
+        f"artifact_dir: {summary.artifact_dir}",
+        f"keep_per_kind: {summary.keep_per_kind}",
+        f"protected: {summary.protected_count}",
+        f"prunable: {summary.prunable_count}",
+    ]
+    for entry in summary.entries:
+        line = f"{entry.artifact_path.name}: kind={entry.artifact_kind} action={entry.action}"
+        if entry.reasons:
+            line += f" reasons={','.join(entry.reasons)}"
+        if entry.referenced_artifact_paths:
+            line += " referenced=" + ",".join(str(path) for path in entry.referenced_artifact_paths)
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def apply_eval_decision_artifact_prune_summary(summary: EvalDecisionArtifactPruneSummary) -> list[Path]:
+    deleted_paths: list[Path] = []
+    for entry in summary.entries:
+        if entry.action != "prune":
+            continue
+        if entry.artifact_path.exists():
+            entry.artifact_path.unlink()
+            deleted_paths.append(entry.artifact_path)
+    return deleted_paths
 
 
 def resolve_eval_artifact_reference(reference: str, artifact_dir: Path) -> Path:
@@ -784,6 +1239,10 @@ def build_eval_history(summaries: list[EvalSummary]) -> EvalHistorySummary:
     scenario_names = sorted({result.scenario_name for summary in summaries for result in summary.results})
     trends: list[EvalScenarioTrend] = []
     artifact_paths = [summary.artifact_path for summary in summaries if summary.artifact_path is not None]
+    pack_counts: dict[str, int] = {}
+    for summary in summaries:
+        pack_id = summary.scenario_pack_id or "unknown"
+        pack_counts[pack_id] = pack_counts.get(pack_id, 0) + 1
     for scenario_name in scenario_names:
         history: list[EvalHistoryEntry] = []
         durations: list[float] = []
@@ -796,6 +1255,7 @@ def build_eval_history(summaries: list[EvalSummary]) -> EvalHistorySummary:
                     artifact_path=summary.artifact_path,
                     created_at=summary.created_at or None,
                     run_label=summary.run_label,
+                    scenario_pack_id=summary.scenario_pack_id,
                     passed=result.passed,
                     duration_seconds=result.duration_seconds,
                     outcome_reason=result.outcome_reason,
@@ -822,8 +1282,15 @@ def build_eval_history(summaries: list[EvalSummary]) -> EvalHistorySummary:
         )
     return EvalHistorySummary(
         artifact_paths=[path for path in artifact_paths],
+        pack_counts=pack_counts,
         scenario_trends=trends,
     )
+
+
+def filter_eval_summaries_by_pack(summaries: list[EvalSummary], selectors: list[str]) -> list[EvalSummary]:
+    available_pack_ids = [(summary.scenario_pack_id or "unknown") for summary in summaries]
+    allowed_pack_ids = _resolve_scenario_pack_selectors(selectors, available_pack_ids)
+    return [summary for summary in summaries if (summary.scenario_pack_id or "unknown") in allowed_pack_ids]
 
 
 def build_eval_task_class_summary(summary: EvalSummary) -> list[EvalTaskClassSummaryEntry]:
@@ -936,6 +1403,49 @@ def _setup_workspace(workspace: Path, setup_kind: str) -> None:
             encoding="utf-8",
         )
         return
+    if setup_kind == "repair_nested_literal":
+        (workspace / "parser.py").write_text(
+            'def parse_status():\n    return "FAIL"\n',
+            encoding="utf-8",
+        )
+        tests_dir = workspace / "tests" / "api"
+        tests_dir.mkdir(parents=True, exist_ok=True)
+        (tests_dir / "test_parser.py").write_text(
+            (
+                "from parser import parse_status\n\n\n"
+                "def test_parse_status():\n"
+                '    assert parse_status() == "OK"\n'
+            ),
+            encoding="utf-8",
+        )
+        return
+    if setup_kind == "repair_literal_regression_guard":
+        (workspace / "status.py").write_text(
+            (
+                'def status_label():\n'
+                '    return "bad"\n\n'
+                "def format_output(value):\n"
+                '    return f\"[{value}]\"\n'
+            ),
+            encoding="utf-8",
+        )
+        (workspace / "test_status.py").write_text(
+            (
+                "from status import status_label\n\n\n"
+                "def test_status_label():\n"
+                '    assert status_label() == "good"\n'
+            ),
+            encoding="utf-8",
+        )
+        (workspace / "test_formatting.py").write_text(
+            (
+                "from status import format_output\n\n\n"
+                "def test_format_output():\n"
+                '    assert format_output("x") == "[x]"\n'
+            ),
+            encoding="utf-8",
+        )
+        return
     if setup_kind == "diagnose":
         (workspace / "calc.py").write_text(
             "def add(a, b):\n    return a - b\n",
@@ -946,6 +1456,13 @@ def _setup_workspace(workspace: Path, setup_kind: str) -> None:
             encoding="utf-8",
         )
         return
+    if setup_kind == "inspect":
+        (workspace / "README.md").write_text("demo project", encoding="utf-8")
+        (workspace / "calc.py").write_text(
+            "def add(a, b):\n    return a + b\n",
+            encoding="utf-8",
+        )
+        return
     if setup_kind == "rename":
         (workspace / "calc.py").write_text(
             "def add(a, b):\n    return a + b\n",
@@ -953,6 +1470,84 @@ def _setup_workspace(workspace: Path, setup_kind: str) -> None:
         )
         (workspace / "test_calc.py").write_text(
             "from calc import add\n\n\ndef test_add():\n    assert add(1, 2) == 3\n",
+            encoding="utf-8",
+        )
+        return
+    if setup_kind == "rename_fixture_refs":
+        (workspace / "config.py").write_text(
+            (
+                "def parse_config(text):\n"
+                "    return text.strip().split('=')\n"
+            ),
+            encoding="utf-8",
+        )
+        (workspace / "conftest.py").write_text(
+            (
+                "from config import parse_config\n\n\n"
+                "def sample_config():\n"
+                "    return parse_config('mode=debug')\n"
+            ),
+            encoding="utf-8",
+        )
+        (workspace / "test_config.py").write_text(
+            (
+                "from config import parse_config\n"
+                "from conftest import sample_config\n\n\n"
+                "def test_parse_config():\n"
+                "    assert parse_config('mode=debug') == ['mode', 'debug']\n\n\n"
+                "def test_sample_config_fixture():\n"
+                "    assert sample_config() == ['mode', 'debug']\n"
+            ),
+            encoding="utf-8",
+        )
+        return
+    if setup_kind == "rename_nested_package":
+        package_dir = workspace / "reports"
+        package_dir.mkdir(parents=True, exist_ok=True)
+        (package_dir / "__init__.py").write_text("", encoding="utf-8")
+        (package_dir / "render.py").write_text(
+            (
+                "def render_summary(value):\n"
+                '    return f"summary:{value}"\n'
+            ),
+            encoding="utf-8",
+        )
+        tests_dir = workspace / "tests" / "unit"
+        tests_dir.mkdir(parents=True, exist_ok=True)
+        (tests_dir / "test_render.py").write_text(
+            (
+                "from reports.render import render_summary\n\n\n"
+                "def test_render_summary():\n"
+                '    assert render_summary("x") == "summary:x"\n'
+            ),
+            encoding="utf-8",
+        )
+        return
+    if setup_kind == "rename_ambiguous_mentions":
+        (workspace / "status_tools.py").write_text(
+            (
+                "def status(value):\n"
+                "    return value.upper()\n\n"
+                "def status_code(value):\n"
+                "    return f'status:{value}'\n"
+            ),
+            encoding="utf-8",
+        )
+        (workspace / "README.md").write_text(
+            (
+                "This repo documents status_code handling.\n"
+                "The exact status symbol should be renamed, but status_code should stay unchanged.\n"
+            ),
+            encoding="utf-8",
+        )
+        (workspace / "test_status_tools.py").write_text(
+            (
+                "from status_tools import status, status_code\n\n\n"
+                "def test_status():\n"
+                '    assert status("ok") == "OK"\n\n\n'
+                "def test_status_code():\n"
+                '    assert status_code("x") == "status:x"\n'
+            ),
             encoding="utf-8",
         )
         return
@@ -1103,8 +1698,61 @@ def _setup_workspace(workspace: Path, setup_kind: str) -> None:
             encoding="utf-8",
         )
         return
+    if setup_kind == "diagnose_repo_fallback":
+        (workspace / "calc.py").write_text(
+            "def add(a, b):\n    return a - b\n",
+            encoding="utf-8",
+        )
+        (workspace / "test_calc.py").write_text(
+            "from calc import add\n\n\ndef test_add():\n    assert add(1, 2) == 3\n",
+            encoding="utf-8",
+        )
+        return
     if setup_kind == "resume_flow":
         (workspace / "README.md").write_text("project intro", encoding="utf-8")
+        return
+    if setup_kind == "resume_repair_flow":
+        (workspace / "calc.py").write_text(
+            "def add(a, b):\n    return a - b\n",
+            encoding="utf-8",
+        )
+        (workspace / "test_calc.py").write_text(
+            "from calc import add\n\n\ndef test_add():\n    assert add(1, 2) == 3\n",
+            encoding="utf-8",
+        )
+        return
+    if setup_kind == "resume_diagnose_flow":
+        (workspace / "calc.py").write_text(
+            "def add(a, b):\n    return a - b\n",
+            encoding="utf-8",
+        )
+        (workspace / "test_calc.py").write_text(
+            "from calc import add\n\n\ndef test_add():\n    assert add(1, 2) == 3\n",
+            encoding="utf-8",
+        )
+        return
+    if setup_kind == "resume_validation_reminder":
+        (workspace / "cli.py").write_text(
+            (
+                "import argparse\n\n"
+                "def build_parser():\n"
+                '    parser = argparse.ArgumentParser(description="demo")\n'
+                "    return parser\n"
+            ),
+            encoding="utf-8",
+        )
+        tests_dir = workspace / "tests" / "regression"
+        tests_dir.mkdir(parents=True, exist_ok=True)
+        (tests_dir / "test_targeted_cli.py").write_text(
+            (
+                "from cli import build_parser\n\n"
+                "def test_targeted_cli_regression():\n"
+                "    parser = build_parser()\n"
+                "    args = parser.parse_args(['--verbose'])\n"
+                "    assert args.verbose is True\n"
+            ),
+            encoding="utf-8",
+        )
         return
     raise ValueError(f"Unknown eval setup kind: {setup_kind}")
 
@@ -1121,6 +1769,24 @@ def _evaluate_scenario_outcome(
         if "return a + b" in (workspace / "calc.py").read_text(encoding="utf-8"):
             return True, "repaired arithmetic bug and passed validation"
         return False, "expected arithmetic fix was not applied"
+    if scenario.setup_kind == "repair_nested_literal":
+        if "Validation passed via run_command." not in final_report:
+            return False, "validation did not pass after nested repair attempt"
+        parser_text = (workspace / "parser.py").read_text(encoding="utf-8")
+        if 'return "OK"' not in parser_text:
+            return False, "expected nested literal repair was not applied"
+        if "tests/api/test_parser.py" not in final_report:
+            return False, "nested test path was not preserved in validation output"
+        return True, "repaired nested-path literal bug and preserved targeted validation"
+    if scenario.setup_kind == "repair_literal_regression_guard":
+        if "Validation passed via run_command." not in final_report:
+            return False, "validation did not pass after regression-guard repair attempt"
+        status_text = (workspace / "status.py").read_text(encoding="utf-8")
+        if 'return "good"' not in status_text:
+            return False, "expected literal repair was not applied"
+        if 'return f"[{value}]"' not in status_text:
+            return False, "formatting helper was unexpectedly changed"
+        return True, "repaired literal bug without breaking formatting behavior"
     if scenario.setup_kind == "rename":
         if "Validation passed via run_command." not in final_report:
             return False, "validation did not pass after rename attempt"
@@ -1129,6 +1795,48 @@ def _evaluate_scenario_outcome(
         if "def plus(a, b):" in calc_text and "from calc import plus" in test_text:
             return True, "renamed symbol across source and test files and passed validation"
         return False, "expected rename edits were not applied"
+    if scenario.setup_kind == "rename_fixture_refs":
+        if "Validation passed via run_command." not in final_report:
+            return False, "validation did not pass after fixture-reference rename"
+        config_text = (workspace / "config.py").read_text(encoding="utf-8")
+        fixture_text = (workspace / "conftest.py").read_text(encoding="utf-8")
+        test_text = (workspace / "test_config.py").read_text(encoding="utf-8")
+        if "def load_config(text):" not in config_text:
+            return False, "expected source rename was not applied"
+        if "from config import load_config" not in fixture_text:
+            return False, "fixture import was not updated"
+        if "from config import load_config" not in test_text:
+            return False, "test import was not updated"
+        if "load_config('mode=debug')" not in test_text:
+            return False, "test call site was not updated"
+        if "sample_config() == ['mode', 'debug']" not in test_text:
+            return False, "test references were not updated consistently"
+        return True, "renamed source, fixture, and test references consistently"
+    if scenario.setup_kind == "rename_nested_package":
+        if "Validation passed via run_command." not in final_report:
+            return False, "validation did not pass after nested-package rename"
+        render_text = (workspace / "reports" / "render.py").read_text(encoding="utf-8")
+        test_text = (workspace / "tests" / "unit" / "test_render.py").read_text(encoding="utf-8")
+        if "def render_report(value):" not in render_text:
+            return False, "expected nested source rename was not applied"
+        if "from reports.render import render_report" not in test_text:
+            return False, "nested test import was not updated"
+        if "tests/unit/test_render.py" not in final_report:
+            return False, "nested test validation path was not preserved"
+        return True, "renamed nested-package symbol and preserved nested test validation"
+    if scenario.setup_kind == "rename_ambiguous_mentions":
+        if "Validation passed via run_command." not in final_report:
+            return False, "validation did not pass after ambiguous rename"
+        source_text = (workspace / "status_tools.py").read_text(encoding="utf-8")
+        readme_text = (workspace / "README.md").read_text(encoding="utf-8")
+        test_text = (workspace / "test_status_tools.py").read_text(encoding="utf-8")
+        if "def state(value):" not in source_text:
+            return False, "expected primary symbol rename was not applied"
+        if "status_code" not in source_text or "status_code" not in readme_text:
+            return False, "ambiguous status_code references were changed unexpectedly"
+        if "from status_tools import state, status_code" not in test_text:
+            return False, "test import was not updated consistently"
+        return True, "renamed the intended symbol while preserving ambiguous status_code references"
     if scenario.setup_kind == "cli_flag":
         if "Validation passed via run_command." not in final_report:
             return False, "validation did not pass after feature edit"
@@ -1190,6 +1898,21 @@ def _evaluate_scenario_outcome(
         if '"profile": os.getenv("APP_PROFILE", "advanced")' in config_text:
             return True, "added requested environment-variable config option and passed validation"
         return False, "expected environment-variable config edit was not applied"
+    if scenario.setup_kind == "inspect":
+        if "Task flow: inspect." not in final_report:
+            return False, "inspect flow report marker was missing"
+        if "No validation was run." not in final_report:
+            return False, "inspect flow did not report skipped validation"
+        if "README.md" not in final_report:
+            return False, "inspect flow did not report README inspection"
+        if record.task_plan is None:
+            return False, "inspect scenario task plan was missing"
+        if (
+            "inspect evidence: request asks for repo inspection and README.md is available for context"
+            not in " ".join(record.task_plan.reasons)
+        ):
+            return False, "inspect scenario did not record explicit inspect reasoning"
+        return True, "summarized repository via explicit inspect planning"
     if scenario.setup_kind == "approval_boundary":
         if "approval is required" not in final_report.lower():
             return False, "expected approval boundary message was missing"
@@ -1223,6 +1946,15 @@ def _evaluate_scenario_outcome(
         if "return a - b" in calc_text:
             return True, "gathered multi-test failure evidence without editing files"
         return False, "diagnose flow unexpectedly edited source files"
+    if scenario.setup_kind == "diagnose_repo_fallback":
+        calc_text = (workspace / "calc.py").read_text(encoding="utf-8")
+        if "Task flow: diagnose." not in final_report:
+            return False, "diagnose flow report marker was missing"
+        if "without applying edits" not in final_report:
+            return False, "diagnose flow did not report no-edit completion"
+        if "return a - b" in calc_text:
+            return True, "produced bounded diagnosis from workspace context without editing files"
+        return False, "diagnose fallback unexpectedly edited source files"
     if scenario.setup_kind == "resume_flow":
         if (
             "Resumed from session " in final_report
@@ -1230,6 +1962,30 @@ def _evaluate_scenario_outcome(
         ):
             return True, "resumed prior session context and produced a resumed report"
         return False, "resume flow did not carry prior session context into the report"
+    if scenario.setup_kind == "resume_repair_flow":
+        if "Resumed from session " not in final_report:
+            return False, "repair resume did not reference the prior session"
+        if "Task flow: fix." not in final_report:
+            return False, "repair resume did not stay in the fix flow"
+        if "Validation passed via run_command." not in final_report:
+            return False, "repair resume did not rerun validation"
+        return True, "resumed prior repair context and reran validation in fix flow"
+    if scenario.setup_kind == "resume_diagnose_flow":
+        if "Resumed from session " not in final_report:
+            return False, "diagnose resume did not reference the prior session"
+        if "Task flow: diagnose." not in final_report:
+            return False, "diagnose resume did not stay in the diagnose flow"
+        if "without applying edits" not in final_report:
+            return False, "diagnose resume did not preserve no-edit behavior"
+        return True, "resumed prior diagnose context without switching into edit mode"
+    if scenario.setup_kind == "resume_validation_reminder":
+        if "Resumed from session " not in final_report:
+            return False, "validation-reminder resume did not reference the prior session"
+        if "Validation passed via run_command." not in final_report:
+            return False, "validation-reminder resume did not rerun validation"
+        if "tests/regression/test_targeted_cli.py" not in final_report:
+            return False, "targeted validation path was not preserved on resume"
+        return True, "resumed prior feature work and reran the targeted validation command"
     return False, "unknown eval scenario kind"
 
 
@@ -1237,6 +1993,48 @@ def _run_scenario(scenario: EvalScenario, workspace: Path, store: SessionStore):
     if scenario.setup_kind == "resume_flow":
         first = run_session(
             "summarize this repo",
+            workspace,
+            store,
+            auto_approve_commands=scenario.auto_approve_commands,
+        )
+        return run_session(
+            scenario.request,
+            workspace,
+            store,
+            auto_approve_commands=scenario.auto_approve_commands,
+            resume_from_session_id=first.session_id,
+        )
+    if scenario.setup_kind == "resume_repair_flow":
+        first = run_session(
+            "fix the failing test",
+            workspace,
+            store,
+            auto_approve_commands=scenario.auto_approve_commands,
+        )
+        return run_session(
+            scenario.request,
+            workspace,
+            store,
+            auto_approve_commands=scenario.auto_approve_commands,
+            resume_from_session_id=first.session_id,
+        )
+    if scenario.setup_kind == "resume_diagnose_flow":
+        first = run_session(
+            "investigate the failing tests",
+            workspace,
+            store,
+            auto_approve_commands=scenario.auto_approve_commands,
+        )
+        return run_session(
+            scenario.request,
+            workspace,
+            store,
+            auto_approve_commands=scenario.auto_approve_commands,
+            resume_from_session_id=first.session_id,
+        )
+    if scenario.setup_kind == "resume_validation_reminder":
+        first = run_session(
+            "add a --verbose flag",
             workspace,
             store,
             auto_approve_commands=scenario.auto_approve_commands,
@@ -1269,6 +2067,42 @@ def _duration_trend(history: list[EvalHistoryEntry]) -> str:
     return "slower"
 
 
+_SCENARIO_PACK_ALIASES = {
+    "built-in": "built-in",
+    "builtin": "built-in",
+    "smoke": "coding-agent-v1-smoke",
+    "core": "coding-agent-v1-core",
+    "stress": "coding-agent-v1-stress",
+}
+
+
+def _resolve_scenario_pack_selector(selector: str, index: EvalArtifactIndex) -> str | None:
+    normalized = selector.strip().lower()
+    alias_match = _SCENARIO_PACK_ALIASES.get(normalized)
+    if alias_match is not None:
+        return alias_match
+    available_pack_ids = {entry.scenario_pack_id for entry in index.entries if entry.scenario_pack_id is not None}
+    if selector in available_pack_ids:
+        return selector
+    return None
+
+
+def _resolve_scenario_pack_selectors(selectors: list[str], available_pack_ids: list[str] | set[str]) -> set[str]:
+    available = set(available_pack_ids)
+    resolved: set[str] = set()
+    for selector in selectors:
+        normalized = selector.strip().lower()
+        alias_match = _SCENARIO_PACK_ALIASES.get(normalized)
+        if alias_match is not None:
+            resolved.add(alias_match)
+            continue
+        if selector in available:
+            resolved.add(selector)
+            continue
+        raise ValueError(f"Unknown scenario pack selector: {selector}")
+    return resolved
+
+
 def _resolve_eval_artifact_alias(reference: str, index: EvalArtifactIndex) -> Path | None:
     if reference == "latest":
         if not index.entries:
@@ -1280,24 +2114,44 @@ def _resolve_eval_artifact_alias(reference: str, index: EvalArtifactIndex) -> Pa
             raise ValueError("No fully passing eval artifacts are available.")
         return passing_entries[0].artifact_path
     if reference.startswith("latest-pass:"):
-        prefix = reference.split(":", 1)[1]
+        selector = reference.split(":", 1)[1]
+        pack_id = _resolve_scenario_pack_selector(selector, index)
+        if pack_id is not None:
+            matching_entries = [
+                entry
+                for entry in index.entries
+                if entry.passed == entry.total and entry.scenario_pack_id == pack_id
+            ]
+            if not matching_entries:
+                raise ValueError(f"No fully passing eval artifact found for scenario pack: {selector}")
+            return matching_entries[0].artifact_path
         matching_entries = [
             entry
             for entry in index.entries
-            if entry.passed == entry.total and entry.run_label is not None and entry.run_label.startswith(prefix)
+            if entry.passed == entry.total and entry.run_label is not None and entry.run_label.startswith(selector)
         ]
         if not matching_entries:
-            raise ValueError(f"No fully passing eval artifact found for label prefix: {prefix}")
+            raise ValueError(f"No fully passing eval artifact found for label prefix: {selector}")
         return matching_entries[0].artifact_path
     if reference.startswith("latest:"):
-        prefix = reference.split(":", 1)[1]
+        selector = reference.split(":", 1)[1]
+        pack_id = _resolve_scenario_pack_selector(selector, index)
+        if pack_id is not None:
+            matching_entries = [
+                entry
+                for entry in index.entries
+                if entry.scenario_pack_id == pack_id
+            ]
+            if not matching_entries:
+                raise ValueError(f"No eval artifact found for scenario pack: {selector}")
+            return matching_entries[0].artifact_path
         matching_entries = [
             entry
             for entry in index.entries
-            if entry.run_label is not None and entry.run_label.startswith(prefix)
+            if entry.run_label is not None and entry.run_label.startswith(selector)
         ]
         if not matching_entries:
-            raise ValueError(f"No eval artifact found for label prefix: {prefix}")
+            raise ValueError(f"No eval artifact found for label prefix: {selector}")
         return matching_entries[0].artifact_path
     return None
 
@@ -1305,12 +2159,31 @@ def _resolve_eval_artifact_alias(reference: str, index: EvalArtifactIndex) -> Pa
 def _resolve_eval_baseline_reference(reference: str, artifact_dir: Path) -> Path | None:
     if not reference.startswith("baseline:"):
         return None
-    name = reference.split(":", 1)[1]
+    body = reference.split(":", 1)[1]
+    if ":" in body:
+        name, selector = body.split(":", 1)
+    else:
+        name, selector = body, None
     config = load_eval_baseline_config(artifact_dir)
     path = config.baselines.get(name)
     if path is None:
         raise ValueError(f"No named baseline found: {name}")
+    if selector is not None:
+        if path.exists():
+            baseline_summary = load_eval_summary(path)
+            baseline_pack_id = baseline_summary.scenario_pack_id or "unknown"
+        else:
+            baseline_pack_id = config.baseline_pack_ids.get(name) or "unknown"
+        allowed_pack_ids = _resolve_scenario_pack_selectors([selector], [baseline_pack_id])
+        if baseline_pack_id not in allowed_pack_ids:
+            raise ValueError(f"Named baseline {name} does not match scenario pack selector: {selector}")
     return path
+
+
+def _default_candidate_reference_for_baseline(baseline: EvalSummary, candidate_reference: str) -> str:
+    if candidate_reference == "latest-pass" and baseline.scenario_pack_id is not None:
+        return f"latest-pass:{baseline.scenario_pack_id}"
+    return candidate_reference
 
 
 def _baseline_config_path(artifact_dir: Path) -> Path:
@@ -1325,3 +2198,32 @@ def _jsonify_paths(value):
     if isinstance(value, list):
         return [_jsonify_paths(item) for item in value]
     return value
+
+
+def _extract_referenced_eval_artifact_paths(path: Path) -> tuple[Path, ...]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    matches: list[Path] = []
+    seen: set[Path] = set()
+
+    def visit(value, *, key: str | None = None) -> None:
+        if isinstance(value, dict):
+            for nested_key, nested_value in value.items():
+                visit(nested_value, key=nested_key)
+            return
+        if isinstance(value, list):
+            for item in value:
+                visit(item, key=key)
+            return
+        if not isinstance(value, str):
+            return
+        if key is None or not key.endswith("_artifact_path"):
+            return
+        if key == "decision_artifact_path":
+            return
+        candidate = Path(value)
+        if candidate.name.startswith("eval-summary-") and candidate not in seen:
+            seen.add(candidate)
+            matches.append(candidate)
+
+    visit(payload)
+    return tuple(matches)

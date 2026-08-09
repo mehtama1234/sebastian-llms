@@ -64,8 +64,36 @@ def looks_like_diagnose_request(lowered: str) -> bool:
             "investigate why the tests",
             "look into the failing tests",
             "look into why the tests",
+            "pick up the investigation where we left off",
+            "explain the likely problem in this repo",
         )
     )
+
+
+def looks_like_inspect_request(lowered: str) -> bool:
+    inspect_phrases = (
+        "summarize this repo",
+        "summarise this repo",
+        "inspect this repo",
+        "inspect the repo",
+        "review this repo",
+        "review the repo",
+        "explain this repo",
+        "explain the repo",
+        "look at this repo",
+        "look at the repo",
+        "read the readme",
+        "show me the readme",
+        "summarize the readme",
+        "summarise the readme",
+    )
+    if any(phrase in lowered for phrase in inspect_phrases):
+        return True
+    if "summarize" in lowered or "summarise" in lowered:
+        return "repo" in lowered or "readme" in lowered or "project" in lowered
+    if "inspect" in lowered or "review" in lowered:
+        return "repo" in lowered or "readme" in lowered or "project" in lowered
+    return False
 
 
 def looks_like_fix_request(lowered: str) -> bool:
@@ -97,6 +125,7 @@ def looks_like_fix_request(lowered: str) -> bool:
             "rerun test suite",
             "re-run the test suite",
             "re-run test suite",
+            "rerun the targeted tests",
         )
     ):
         return True
@@ -213,6 +242,15 @@ def failure_report_reason(referenced_tests: list[Path]) -> str:
             "so investigation is safer than direct edits"
         )
     return "diagnose evidence: passive failure report plus workspace tests suggests investigation first"
+
+
+def inspect_reason(instruction_files: list[str]) -> str:
+    if "README.md" in instruction_files:
+        return "inspect evidence: request asks for repo inspection and README.md is available for context"
+    if instruction_files:
+        first = instruction_files[0]
+        return f"inspect evidence: request asks for repo inspection and `{first}` is available for context"
+    return "inspect evidence: request asks for repo inspection without edit-oriented language"
 
 
 def count_symbol_occurrences(workspace_root: Path, symbol: str) -> int:
