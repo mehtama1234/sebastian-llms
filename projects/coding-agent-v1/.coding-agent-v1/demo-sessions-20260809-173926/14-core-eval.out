@@ -1,0 +1,212 @@
+total: 20
+passed: 20
+failed: 0
+created_at: 2026-08-10T00:41:22.664221+00:00
+scenario_pack_id: coding-agent-v1-core
+run_label: demo-core
+artifact_path: .coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/eval-summary-e6c7b9e33c4340bf82cb3f3827ab3de2.json
+trace_count: 20
+fix-001: passed status=completed task_class=fix planner_strategy=deterministic_heuristic duration_seconds=2.161805 reason=repaired arithmetic bug and passed validation session_id=c98f9aa09b7c406096e857ae4403d9c7
+  behavior_ids=task_planning,validation_selection,failure_memory
+  bpe_memory=true
+  compaction_trigger=checkpoint
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-fix-001-c98f9aa09b7c406096e857ae4403d9c7.json
+  actual_tool_sequence=run_command,search_code,edit_file,run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+fix-002: passed status=completed task_class=fix planner_strategy=deterministic_heuristic duration_seconds=2.061573 reason=repaired arithmetic bug and passed validation session_id=95d531451ec14cbb9dcf4ac78213bda1
+  behavior_ids=task_planning,validation_selection,failure_memory
+  bpe_memory=true
+  compaction_trigger=checkpoint
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-fix-002-95d531451ec14cbb9dcf4ac78213bda1.json
+  actual_tool_sequence=run_command,search_code,edit_file,run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+fix-003: passed status=completed task_class=fix planner_strategy=deterministic_heuristic duration_seconds=3.720233 reason=repaired nested-path literal bug and preserved targeted validation session_id=33ac7104862549c4b4fd0fe13eb74d8a
+  behavior_ids=task_planning,validation_selection,failure_memory
+  bpe_memory=true
+  compaction_trigger=checkpoint
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-fix-003-33ac7104862549c4b4fd0fe13eb74d8a.json
+  actual_tool_sequence=run_command,search_code,edit_file,run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+fix-004: passed status=completed task_class=fix planner_strategy=deterministic_heuristic duration_seconds=2.566899 reason=repaired literal bug without breaking formatting behavior session_id=51daff1fb69a4dd0b2bd6d705d1742c2
+  behavior_ids=task_planning,validation_selection,failure_memory
+  bpe_memory=true
+  compaction_trigger=checkpoint
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-fix-004-51daff1fb69a4dd0b2bd6d705d1742c2.json
+  actual_tool_sequence=run_command,search_code,edit_file,run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+feature-001: passed status=completed task_class=feature planner_strategy=deterministic_heuristic duration_seconds=1.488238 reason=added requested CLI flag and passed validation session_id=94228f952d0b420f8ec824df7148b49f
+  behavior_ids=task_planning,validation_selection
+  bpe_memory=true
+  compaction_trigger=checkpoint
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-feature-001-94228f952d0b420f8ec824df7148b49f.json
+  actual_tool_sequence=search_code,edit_file,run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+feature-002: passed status=completed task_class=feature planner_strategy=deterministic_heuristic duration_seconds=1.072259 reason=added requested config option and passed validation session_id=5e2a8125cf774100a16b3d7f0423462d
+  behavior_ids=task_planning,validation_selection
+  bpe_memory=true
+  compaction_trigger=checkpoint
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-feature-002-5e2a8125cf774100a16b3d7f0423462d.json
+  actual_tool_sequence=search_code,edit_file,run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+feature-003: passed status=completed task_class=feature planner_strategy=deterministic_heuristic duration_seconds=1.48576 reason=added requested environment-variable config option and passed validation session_id=d980374527b248be9d6b810043b526a4
+  behavior_ids=task_planning,validation_selection
+  bpe_memory=true
+  compaction_trigger=checkpoint
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-feature-003-d980374527b248be9d6b810043b526a4.json
+  actual_tool_sequence=search_code,edit_file,run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+feature-004: passed status=completed task_class=feature planner_strategy=deterministic_heuristic duration_seconds=1.057938 reason=added requested CLI flag and passed validation session_id=5371e086ab3d4f12928f0d633886d84a
+  behavior_ids=task_planning,validation_selection
+  bpe_memory=true
+  compaction_trigger=checkpoint
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-feature-004-5371e086ab3d4f12928f0d633886d84a.json
+  actual_tool_sequence=search_code,edit_file,run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+rename-001: passed status=completed task_class=rename planner_strategy=deterministic_heuristic duration_seconds=1.156392 reason=renamed symbol across source and test files and passed validation session_id=556136af6c0a46aeb18edb23062536bc
+  behavior_ids=task_planning,validation_selection
+  bpe_memory=true
+  compaction_trigger=checkpoint
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-rename-001-556136af6c0a46aeb18edb23062536bc.json
+  actual_tool_sequence=search_code,rename_symbol_in_file,rename_symbol_in_file,run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+rename-002: passed status=completed task_class=rename planner_strategy=deterministic_heuristic duration_seconds=1.097415 reason=renamed source, fixture, and test references consistently session_id=a86393e946ba4cb793055f433fe426c3
+  behavior_ids=task_planning,validation_selection
+  bpe_memory=true
+  compaction_trigger=size_triggered:event_count
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-rename-002-a86393e946ba4cb793055f433fe426c3.json
+  actual_tool_sequence=search_code,rename_symbol_in_file,rename_symbol_in_file,rename_symbol_in_file,run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+rename-003: passed status=completed task_class=rename planner_strategy=deterministic_heuristic duration_seconds=2.033214 reason=renamed nested-package symbol and preserved nested test validation session_id=9397a7443e7948faa4d5026102524f54
+  behavior_ids=task_planning,validation_selection
+  bpe_memory=true
+  compaction_trigger=checkpoint
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-rename-003-9397a7443e7948faa4d5026102524f54.json
+  actual_tool_sequence=search_code,rename_symbol_in_file,rename_symbol_in_file,run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+rename-004: passed status=completed task_class=rename planner_strategy=deterministic_heuristic duration_seconds=1.300562 reason=renamed the intended symbol while preserving ambiguous status_code references session_id=d3c8b74b6a2d441a8848b1be42acb0be
+  behavior_ids=task_planning,validation_selection
+  bpe_memory=true
+  compaction_trigger=size_triggered:event_count
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-rename-004-d3c8b74b6a2d441a8848b1be42acb0be.json
+  actual_tool_sequence=read_file,search_code,rename_symbol_in_file,rename_symbol_in_file,rename_symbol_in_file,run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+diagnose-001: passed status=failed task_class=diagnose planner_strategy=deterministic_heuristic duration_seconds=1.202328 reason=gathered failure evidence without editing files session_id=7e8ce7aef4994c6480866b9417c8e96a
+  behavior_ids=task_planning,session_persistence
+  repair_record_ids=7e8ce7aef4994c6480866b9417c8e96a-validation-failed
+  bpe_memory=true
+  compaction_trigger=size_triggered:blocked_state
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-diagnose-001-7e8ce7aef4994c6480866b9417c8e96a.json
+  actual_tool_sequence=run_command,search_code
+  expectation_checks=tool_sequence=ok escalation=ok
+diagnose-002: passed status=failed task_class=diagnose planner_strategy=deterministic_heuristic duration_seconds=2.008668 reason=gathered multi-test failure evidence without editing files session_id=3a5d6881c404470a9ef0424dd629e80a
+  behavior_ids=task_planning,session_persistence
+  repair_record_ids=3a5d6881c404470a9ef0424dd629e80a-validation-failed
+  bpe_memory=true
+  compaction_trigger=size_triggered:context_chars,blocked_state
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-diagnose-002-3a5d6881c404470a9ef0424dd629e80a.json
+  actual_tool_sequence=run_command,search_code,search_code
+  expectation_checks=tool_sequence=ok escalation=ok
+diagnose-003: passed status=failed task_class=diagnose planner_strategy=deterministic_heuristic duration_seconds=0.019323 reason=correctly stopped on approval boundary after selecting full-suite fallback validation session_id=a913a3472a3e476d877e0da37a37fc45
+  behavior_ids=task_planning,session_persistence
+  repair_record_ids=a913a3472a3e476d877e0da37a37fc45-approval-required
+  bpe_memory=true
+  compaction_trigger=size_triggered:blocked_state
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-diagnose-003-a913a3472a3e476d877e0da37a37fc45.json
+  actual_tool_sequence=run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+diagnose-004: passed status=failed task_class=diagnose planner_strategy=deterministic_heuristic duration_seconds=0.910462 reason=produced bounded diagnosis from workspace context without editing files session_id=96b14694f03247408f5bdac96912a940
+  behavior_ids=task_planning,session_persistence
+  repair_record_ids=96b14694f03247408f5bdac96912a940-validation-failed
+  bpe_memory=true
+  compaction_trigger=size_triggered:blocked_state
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-diagnose-004-96b14694f03247408f5bdac96912a940.json
+  actual_tool_sequence=run_command,search_code
+  expectation_checks=tool_sequence=ok escalation=ok
+resume-001: passed status=completed task_class=resume planner_strategy=deterministic_heuristic duration_seconds=0.046248 reason=resumed prior session context and produced a resumed report session_id=405e5c12317c43bb869523e53e9d2d29
+  behavior_ids=task_planning,handoff_and_resume,session_persistence
+  bpe_memory=true
+  compact_context=true
+  compaction_trigger=size_triggered:resume_checkpoint
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-resume-001-405e5c12317c43bb869523e53e9d2d29.json
+  actual_tool_sequence=read_file
+  expectation_checks=tool_sequence=ok escalation=ok
+resume-002: passed status=completed task_class=resume planner_strategy=deterministic_heuristic duration_seconds=4.507085 reason=resumed prior repair context and reran validation in fix flow session_id=7b742d66e3d140c8a59ea3958cf83d11
+  behavior_ids=task_planning,handoff_and_resume,session_persistence
+  bpe_memory=true
+  compact_context=true
+  compaction_trigger=size_triggered:resume_checkpoint
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-resume-002-7b742d66e3d140c8a59ea3958cf83d11.json
+  actual_tool_sequence=run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+resume-003: passed status=failed task_class=resume planner_strategy=deterministic_heuristic duration_seconds=2.037303 reason=resumed prior diagnose context without switching into edit mode session_id=b555297b3a254b5ea8e84ea664bc0ac9
+  behavior_ids=task_planning,handoff_and_resume,session_persistence
+  repair_record_ids=84f5db3d724d4cd7b495eac681653b88-validation-failed,b555297b3a254b5ea8e84ea664bc0ac9-validation-failed
+  bpe_memory=true
+  compact_context=true
+  compaction_trigger=size_triggered:context_chars,blocked_state,resume_checkpoint
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-resume-003-b555297b3a254b5ea8e84ea664bc0ac9.json
+  actual_tool_sequence=run_command,search_code
+  expectation_checks=tool_sequence=ok escalation=ok
+resume-004: passed status=completed task_class=resume planner_strategy=deterministic_heuristic duration_seconds=2.014075 reason=resumed prior feature work and reran the targeted validation command session_id=19efbfb62db24724b4d01aeded1bd16f
+  behavior_ids=task_planning,handoff_and_resume,session_persistence
+  bpe_memory=true
+  compact_context=true
+  compaction_trigger=size_triggered:resume_checkpoint
+  trace_artifact_path=.coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/trace-artifacts/trace-resume-004-19efbfb62db24724b4d01aeded1bd16f.json
+  actual_tool_sequence=run_command
+  expectation_checks=tool_sequence=ok escalation=ok
+
+task_class_summary:
+diagnose: passed=4/4 failed=0 scenarios=diagnose-001,diagnose-002,diagnose-003,diagnose-004
+feature: passed=4/4 failed=0 scenarios=feature-001,feature-002,feature-003,feature-004
+fix: passed=4/4 failed=0 scenarios=fix-001,fix-002,fix-003,fix-004
+rename: passed=4/4 failed=0 scenarios=rename-001,rename-002,rename-003,rename-004
+resume: passed=4/4 failed=0 scenarios=resume-001,resume-002,resume-003,resume-004
+
+failure_mode_summary:
+bad_validation_scope: passed=15/15 failed=0 scenarios=diagnose-001,diagnose-002,diagnose-003,diagnose-004,feature-001,feature-002,feature-003,fix-001,fix-002,fix-003,fix-004,rename-002,rename-004,resume-002,resume-004
+diagnose_edited_repo: passed=4/4 failed=0 scenarios=diagnose-001,diagnose-002,diagnose-004,resume-003
+global_replacement: passed=1/1 failed=0 scenarios=rename-004
+no_op: passed=10/10 failed=0 scenarios=diagnose-001,diagnose-003,diagnose-004,feature-001,feature-004,fix-001,fix-002,resume-001,resume-002,resume-004
+partial_fix: passed=10/10 failed=0 scenarios=feature-001,feature-002,feature-003,feature-004,fix-002,fix-003,fix-004,rename-001,rename-002,rename-003
+regression_introduced: passed=4/4 failed=0 scenarios=feature-003,fix-004,rename-001,rename-003
+resume_memory_loss: passed=4/4 failed=0 scenarios=resume-001,resume-002,resume-003,resume-004
+unsafe_action: passed=1/1 failed=0 scenarios=diagnose-003
+wrong_file_touched: passed=11/11 failed=0 scenarios=diagnose-002,feature-002,feature-004,fix-001,fix-003,rename-001,rename-002,rename-003,rename-004,resume-001,resume-003
+
+trace_summary:
+trace_count: 20
+safe_count: 20
+unsafe_count: 0
+tool_sequence_match: 20/20
+escalation_match: 20/20
+first_failure_states:
+  none: count=20 scenarios=diagnose-001,diagnose-002,diagnose-003,diagnose-004,feature-001,feature-002,feature-003,feature-004,fix-001,fix-002,fix-003,fix-004,rename-001,rename-002,rename-003,rename-004,resume-001,resume-002,resume-003,resume-004
+primary_failure_modes:
+  none: count=20 scenarios=diagnose-001,diagnose-002,diagnose-003,diagnose-004,feature-001,feature-002,feature-003,feature-004,fix-001,fix-002,fix-003,fix-004,rename-001,rename-002,rename-003,rename-004,resume-001,resume-002,resume-003,resume-004
+fix-001: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+fix-002: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+fix-003: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+fix-004: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+feature-001: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+feature-002: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+feature-003: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+feature-004: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+rename-001: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+rename-002: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+rename-003: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+rename-004: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+diagnose-001: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+diagnose-002: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+diagnose-003: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+diagnose-004: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+resume-001: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+resume-002: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+resume-003: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+resume-004: first_failure_state=none first_failure_from_state=none primary_failure_mode=none task_completed=True safe=True tool_sequence_ok=ok escalation_ok=ok
+
+tool_sequence_expectation_summary:
+matched=20/20 unmatched=
+
+escalation_expectation_summary:
+matched=20/20 unmatched=

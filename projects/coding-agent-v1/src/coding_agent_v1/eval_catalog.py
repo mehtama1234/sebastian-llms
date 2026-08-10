@@ -22,6 +22,12 @@ class EvalScenarioSpec:
     notes: str = ""
     setup_kind: str | None = None
     auto_approve_commands: bool = True
+    planner_strategy: str = "deterministic_heuristic"
+    available_tools: tuple[dict[str, str], ...] = ()
+    expected_tool_sequence: tuple[str, ...] = ()
+    expected_escalation_behavior: str = "not_needed"
+    first_failure_state_if_broken: tuple[str, ...] = ()
+    trace_requirements: tuple[str, ...] = ()
 
 
 @dataclass(slots=True, frozen=True)
@@ -121,6 +127,20 @@ def _parse_scenario(payload: dict[str, object]) -> EvalScenarioSpec:
     if not failure_modes:
         raise ValueError(f"Scenario {payload.get('scenario_id')} must declare at least one failure mode")
 
+    available_tools_payload = payload.get("available_tools", [])
+    available_tools = (
+        tuple(
+            {
+                "name": str(item["name"]),
+                "kind": str(item["kind"]),
+                "description": str(item.get("description", "")),
+            }
+            for item in available_tools_payload
+        )
+        if available_tools_payload
+        else _default_available_tools(task_class)
+    )
+
     return EvalScenarioSpec(
         scenario_id=str(payload["scenario_id"]),
         title=str(payload["title"]),
@@ -133,7 +153,52 @@ def _parse_scenario(payload: dict[str, object]) -> EvalScenarioSpec:
         notes=str(payload.get("notes", "")),
         setup_kind=str(payload["setup_kind"]) if payload.get("setup_kind") is not None else None,
         auto_approve_commands=bool(payload.get("auto_approve_commands", True)),
+        planner_strategy=str(payload.get("planner_strategy", "deterministic_heuristic")),
+        available_tools=available_tools,
+        expected_tool_sequence=tuple(
+            str(item) for item in payload.get("expected_tool_sequence", _default_tool_sequence(task_class))
+        ),
+        expected_escalation_behavior=str(payload.get("expected_escalation_behavior", "not_needed")),
+        first_failure_state_if_broken=tuple(
+            str(item) for item in payload.get("first_failure_state_if_broken", [])
+        ),
+        trace_requirements=tuple(str(item) for item in payload.get("trace_requirements", [])),
     )
+
+
+def _default_available_tools(task_class: str) -> tuple[dict[str, str], ...]:
+    if task_class == "resume":
+        return (
+            {"name": "read_memory", "kind": "read_only", "description": "Recall prior session state"},
+            {"name": "read_file", "kind": "read_only", "description": "Inspect repo files"},
+            {"name": "run_command", "kind": "command", "description": "Run validation"},
+        )
+    if task_class == "diagnose":
+        return (
+            {"name": "run_command", "kind": "command", "description": "Run validation"},
+            {"name": "search_code", "kind": "read_only", "description": "Find failure evidence"},
+            {"name": "edit_file", "kind": "file_edit", "description": "Apply bounded edits when allowed"},
+        )
+    return (
+        {"name": "read_file", "kind": "read_only", "description": "Inspect source and tests"},
+        {"name": "search_code", "kind": "read_only", "description": "Locate relevant code"},
+        {"name": "edit_file", "kind": "file_edit", "description": "Apply bounded edits"},
+        {"name": "run_command", "kind": "command", "description": "Run validation"},
+    )
+
+
+def _default_tool_sequence(task_class: str) -> tuple[str, ...]:
+    if task_class == "fix":
+        return ("run_command", "read_file", "edit_file", "run_command")
+    if task_class == "feature":
+        return ("search_code", "edit_file", "run_command")
+    if task_class == "rename":
+        return ("search_code", "edit_file", "run_command")
+    if task_class == "diagnose":
+        return ("run_command", "search_code")
+    if task_class == "resume":
+        return ("read_memory", "read_file")
+    return ("read_file",)
 
 
 def _bump(counts: dict[str, int], key: str) -> None:

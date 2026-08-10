@@ -1,0 +1,51 @@
+regressions: 0
+expectation_regressions: 0
+improvements: 0
+unchanged: 20
+created_at: 2026-08-10T00:41:56.033256+00:00
+baseline_scenario_pack_id: coding-agent-v1-core
+candidate_scenario_pack_id: coding-agent-v1-core
+artifact_path: .coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/decision-artifacts/eval-comparison-1996fa0072994978bc661efa4f81f40a.json
+baseline_artifact_path: .coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/eval-summary-e6c7b9e33c4340bf82cb3f3827ab3de2.json
+candidate_artifact_path: .coding-agent-v1/demo-sessions-20260809-173926/eval-artifacts/eval-summary-72236ed9677f4cb781ed7742ece1127a.json
+trace_first_failure_comparison:
+  none: baseline=20 candidate=20 delta=0 baseline_scenarios=diagnose-001,diagnose-002,diagnose-003,diagnose-004,feature-001,feature-002,feature-003,feature-004,fix-001,fix-002,fix-003,fix-004,rename-001,rename-002,rename-003,rename-004,resume-001,resume-002,resume-003,resume-004 candidate_scenarios=diagnose-001,diagnose-002,diagnose-003,diagnose-004,feature-001,feature-002,feature-003,feature-004,fix-001,fix-002,fix-003,fix-004,rename-001,rename-002,rename-003,rename-004,resume-001,resume-002,resume-003,resume-004
+trace_primary_failure_comparison:
+  none: baseline=20 candidate=20 delta=0 baseline_scenarios=diagnose-001,diagnose-002,diagnose-003,diagnose-004,feature-001,feature-002,feature-003,feature-004,fix-001,fix-002,fix-003,fix-004,rename-001,rename-002,rename-003,rename-004,resume-001,resume-002,resume-003,resume-004 candidate_scenarios=diagnose-001,diagnose-002,diagnose-003,diagnose-004,feature-001,feature-002,feature-003,feature-004,fix-001,fix-002,fix-003,fix-004,rename-001,rename-002,rename-003,rename-004,resume-001,resume-002,resume-003,resume-004
+tool_sequence_expectation_comparison:
+  tool_sequence: baseline=20/20 candidate=20/20 matched_delta=0 baseline_unmatched= candidate_unmatched=
+escalation_expectation_comparison:
+  escalation: baseline=20/20 candidate=20/20 matched_delta=0 baseline_unmatched= candidate_unmatched=
+diagnose-001: unchanged task_class=diagnose baseline_passed=True candidate_passed=True duration_delta_seconds=-0.400872
+diagnose-002: unchanged task_class=diagnose baseline_passed=True candidate_passed=True duration_delta_seconds=-0.905774
+diagnose-003: unchanged task_class=diagnose baseline_passed=True candidate_passed=True duration_delta_seconds=-0.003301
+diagnose-004: unchanged task_class=diagnose baseline_passed=True candidate_passed=True duration_delta_seconds=0.214272
+feature-001: unchanged task_class=feature baseline_passed=True candidate_passed=True duration_delta_seconds=-0.356535
+feature-002: unchanged task_class=feature baseline_passed=True candidate_passed=True duration_delta_seconds=-0.117282
+feature-003: unchanged task_class=feature baseline_passed=True candidate_passed=True duration_delta_seconds=-0.583141
+feature-004: unchanged task_class=feature baseline_passed=True candidate_passed=True duration_delta_seconds=-0.157381
+fix-001: unchanged task_class=fix baseline_passed=True candidate_passed=True duration_delta_seconds=0.061243
+fix-002: unchanged task_class=fix baseline_passed=True candidate_passed=True duration_delta_seconds=-0.231823
+fix-003: unchanged task_class=fix baseline_passed=True candidate_passed=True duration_delta_seconds=-1.795884
+fix-004: unchanged task_class=fix baseline_passed=True candidate_passed=True duration_delta_seconds=0.035906
+rename-001: unchanged task_class=rename baseline_passed=True candidate_passed=True duration_delta_seconds=-0.213333
+rename-002: unchanged task_class=rename baseline_passed=True candidate_passed=True duration_delta_seconds=-0.350516
+rename-003: unchanged task_class=rename baseline_passed=True candidate_passed=True duration_delta_seconds=-1.31239
+rename-004: unchanged task_class=rename baseline_passed=True candidate_passed=True duration_delta_seconds=-0.5162
+resume-001: unchanged task_class=resume baseline_passed=True candidate_passed=True duration_delta_seconds=-0.019882
+resume-002: unchanged task_class=resume baseline_passed=True candidate_passed=True duration_delta_seconds=-1.3453
+resume-003: unchanged task_class=resume baseline_passed=True candidate_passed=True duration_delta_seconds=-0.020382
+resume-004: unchanged task_class=resume baseline_passed=True candidate_passed=True duration_delta_seconds=0.117623
+
+task_class_comparison_summary:
+diagnose: regressions=0 improvements=0 unchanged=4 scenarios=diagnose-001,diagnose-002,diagnose-003,diagnose-004
+feature: regressions=0 improvements=0 unchanged=4 scenarios=feature-001,feature-002,feature-003,feature-004
+fix: regressions=0 improvements=0 unchanged=4 scenarios=fix-001,fix-002,fix-003,fix-004
+rename: regressions=0 improvements=0 unchanged=4 scenarios=rename-001,rename-002,rename-003,rename-004
+resume: regressions=0 improvements=0 unchanged=4 scenarios=resume-001,resume-002,resume-003,resume-004
+
+tool_sequence_expectation_comparison_summary:
+tool_sequence: baseline=20/20 candidate=20/20 matched_delta=0
+
+escalation_expectation_comparison_summary:
+escalation: baseline=20/20 candidate=20/20 matched_delta=0

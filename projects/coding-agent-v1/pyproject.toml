@@ -12,6 +12,7 @@ dependencies = []
 
 [project.scripts]
 coding-agent-v1 = "coding_agent_v1.cli:main"
+coding-agent-v1-model-planner-adapter = "coding_agent_v1.model_planner_adapter:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -1,0 +1,5 @@
+compact_contexts: 4
+5eb4b8e99fd54cf28ffbf12849c43f43: status=completed task_flow=inspect trigger=size_triggered:resume_checkpoint events=9 chars=6397 path=.coding-agent-v1/demo-sessions-20260809-173926/compactions/5eb4b8e99fd54cf28ffbf12849c43f43.compact.json
+f19bfaa158a7456db6fb9134177c201d: status=failed task_flow=fix trigger=size_triggered:blocked_state events=12 chars=5791 path=.coding-agent-v1/demo-sessions-20260809-173926/compactions/f19bfaa158a7456db6fb9134177c201d.compact.json
+b9aae2894ae24cd1bd157b46602db006: status=completed task_flow=inspect trigger=size_triggered:resume_checkpoint events=10 chars=5989 path=.coding-agent-v1/demo-sessions-20260809-173926/compactions/b9aae2894ae24cd1bd157b46602db006.compact.json
+10ff5add1c974d2b93993818a75b7d63: status=completed task_flow=inspect trigger=checkpoint events=8 chars=5239 path=.coding-agent-v1/demo-sessions-20260809-173926/compactions/10ff5add1c974d2b93993818a75b7d63.compact.json

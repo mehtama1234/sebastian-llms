@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qwen3-parity"
+version = "0.1.0"
+description = "Reference-vs-scratch parity workspace for Qwen3 0.6B"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "huggingface_hub>=0.34.0",
+  "safetensors>=0.5.0",
+  "torch>=2.7.0",
+  "transformers>=4.51.0",
+]
+
+[project.scripts]
+qwen3-reference-inspect = "qwen3_parity.reference.inspect:main"
+qwen3-scratch-config = "qwen3_parity.scratch.config_snapshot:main"
+qwen3-weight-map = "qwen3_parity.weight_map:main"
+qwen3-weight-manifest = "qwen3_parity.weight_manifest:main"
+qwen3-smoke = "qwen3_parity.smoke:main"
+qwen3-real-subset-probe = "qwen3_parity.real_subset_probe:main"
+qwen3-layer0-forward-parity = "qwen3_parity.layer0_forward_parity:main"
+qwen3-prefix-logits-parity = "qwen3_parity.prefix_logits_parity:main"
+qwen3-full-prompt-set-parity = "qwen3_parity.full_prompt_set_parity:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

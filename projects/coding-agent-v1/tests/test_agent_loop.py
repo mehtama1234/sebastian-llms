@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import sys
 
 from coding_agent_v1.agent_loop import build_task_plan, classify_task_flow, run_session
 from coding_agent_v1.models import TaskFlow
@@ -35,11 +36,102 @@ def test_build_task_plan_selects_targeted_validation_for_single_test_repo(tmp_pa
     plan = build_task_plan("add a --verbose flag", tmp_path, ["README.md"])
 
     assert plan.task_flow is TaskFlow.FEATURE
+    assert plan.planner_strategy == "deterministic_heuristic"
+    assert plan.planner_strategy_reason
     assert plan.feature_strategy == "cli_flag"
     assert plan.feature_arguments["flag_name"] == "--verbose"
     assert plan.validation_command == "pytest -q test_cli.py"
     assert "selected validation command `pytest -q test_cli.py`" in " ".join(plan.reasons)
     assert "planner selected `feature` from scored task-flow candidates" in " ".join(plan.reasons)
+
+
+def test_build_task_plan_rejects_unsupported_planner_strategy(tmp_path: Path) -> None:
+    (tmp_path / "README.md").write_text("project intro", encoding="utf-8")
+
+    try:
+        build_task_plan(
+            "summarize this repo",
+            tmp_path,
+            ["README.md"],
+            planner_strategy="model_preview",
+        )
+    except ValueError as exc:
+        assert "unsupported planner strategy" in str(exc)
+    else:
+        raise AssertionError("expected unsupported planner strategy to fail")
+
+
+def test_build_task_plan_rejects_unconfigured_model_guided_planner_strategy(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "README.md").write_text("project intro", encoding="utf-8")
+    monkeypatch.delenv("CODING_AGENT_V1_MODEL_PLANNER_COMMAND", raising=False)
+
+    try:
+        build_task_plan(
+            "summarize this repo",
+            tmp_path,
+            ["README.md"],
+            planner_strategy="model_guided",
+        )
+    except ValueError as exc:
+        assert "requires CODING_AGENT_V1_MODEL_PLANNER_COMMAND" in str(exc)
+        assert "no tool action was taken" in str(exc)
+    else:
+        raise AssertionError("expected unconfigured model planner strategy to fail")
+
+
+def test_build_task_plan_accepts_valid_model_guided_planner_output(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "README.md").write_text("project intro", encoding="utf-8")
+    planner_script = tmp_path / "planner.py"
+    planner_script.write_text(
+        "import json, sys\n"
+        "payload = json.loads(sys.stdin.read())\n"
+        "assert payload['deterministic_baseline']['task_flow'] == 'diagnose'\n"
+        "print(json.dumps({'task_flow': 'diagnose', 'reasons': ['model saw failure language']}))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CODING_AGENT_V1_MODEL_PLANNER_COMMAND", f"{sys.executable} {planner_script}")
+
+    plan = build_task_plan(
+        "why are the tests failing?",
+        tmp_path,
+        ["README.md"],
+        planner_strategy="model_guided",
+    )
+
+    assert plan.task_flow is TaskFlow.DIAGNOSE
+    assert plan.planner_strategy == "model_guided"
+    assert "model-guided planner selected" in plan.planner_strategy_reason
+    assert "model planner command selected `diagnose`" in " ".join(plan.reasons)
+    assert "model saw failure language" in " ".join(plan.reasons)
+
+
+def test_build_task_plan_rejects_invalid_model_guided_planner_output(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "README.md").write_text("project intro", encoding="utf-8")
+    planner_script = tmp_path / "planner.py"
+    planner_script.write_text("print('not json')\n", encoding="utf-8")
+    monkeypatch.setenv("CODING_AGENT_V1_MODEL_PLANNER_COMMAND", f"{sys.executable} {planner_script}")
+
+    try:
+        build_task_plan(
+            "summarize this repo",
+            tmp_path,
+            ["README.md"],
+            planner_strategy="model_guided",
+        )
+    except ValueError as exc:
+        assert "did not return valid JSON" in str(exc)
+        assert "no tool action was taken" in str(exc)
+    else:
+        raise AssertionError("expected invalid model planner output to fail")
 
 
 def test_build_task_plan_selects_matching_feature_tests_in_multi_test_repo(tmp_path: Path) -> None:
@@ -256,6 +348,34 @@ def test_build_task_plan_falls_back_to_module_aware_cli_test_selection(tmp_path:
     ) in " ".join(plan.reasons)
 
 
+def test_build_task_plan_includes_behavior_index_evidence_for_harness_workspace(
+    tmp_path: Path,
+) -> None:
+    harness = tmp_path / "src" / "coding_agent_v1"
+    harness.mkdir(parents=True)
+    (harness / "agent_loop.py").write_text(
+        "def build_task_plan(): pass\n"
+        "def build_initial_actions(): pass\n"
+        "def _choose_validation_command(): pass\n"
+        "def _validation_reason(): pass\n",
+        encoding="utf-8",
+    )
+    (harness / "planner.py").write_text("def find_python_test_paths(): pass\n", encoding="utf-8")
+    (harness / "models.py").write_text("class TaskPlan: pass\nclass WorkingMemory: pass\n", encoding="utf-8")
+    (tmp_path / "test_agent_loop.py").write_text("def test_validation():\n    assert True\n", encoding="utf-8")
+
+    plan = build_task_plan(
+        "improve validation selection for rename tasks",
+        tmp_path,
+        [],
+    )
+
+    assert "task_planning" in plan.affected_behavior_ids
+    assert "validation_selection" in plan.affected_behavior_ids
+    assert "src/coding_agent_v1/agent_loop.py" in plan.implementation_surfaces
+    assert "behavior index selected affected behavior(s):" in " ".join(plan.reasons)
+
+
 def test_build_task_plan_inferrs_natural_cli_request_from_workspace_parser_shape(tmp_path: Path) -> None:
     (tmp_path / "README.md").write_text("project intro", encoding="utf-8")
     (tmp_path / "cli.py").write_text(
@@ -304,6 +424,31 @@ def test_build_task_plan_selects_matching_rename_tests_in_multi_test_repo(tmp_pa
     assert plan.validation_command == "pytest -q test_calc.py"
     assert "workspace contains" in " ".join(plan.reasons)
     assert "exact symbol match(es)" in " ".join(plan.reasons)
+
+
+def test_build_task_plan_falls_back_to_module_aware_rename_test_selection(tmp_path: Path) -> None:
+    (tmp_path / "README.md").write_text("project intro", encoding="utf-8")
+    (tmp_path / "report.py").write_text(
+        "def render_summary(value):\n    return value.upper()\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "test_report.py").write_text(
+        (
+            "import report\n\n"
+            "def test_render_report_uses_uppercase_output():\n"
+            "    assert report.render_report('ok') == 'OK'\n"
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "test_other.py").write_text("def test_other():\n    assert True\n", encoding="utf-8")
+
+    plan = build_task_plan("rename render_summary to render_report", tmp_path, ["README.md"])
+
+    assert plan.task_flow is TaskFlow.RENAME
+    assert plan.validation_command == "pytest -q test_report.py"
+    assert "selected validation command `pytest -q test_report.py` from module-aware rename test evidence" in " ".join(
+        plan.reasons
+    )
 
 
 def test_build_task_plan_selects_matching_config_option_tests_in_multi_test_repo(tmp_path: Path) -> None:
@@ -785,6 +930,13 @@ def test_run_session_runs_validation_for_test_request(tmp_path: Path) -> None:
 
     assert record.status.value == "failed"
     assert "approval is required" in record.final_report.lower()
+    handoff = store.load_handoff(record.session_id)
+    assert handoff.reason == "approval_required"
+    assert handoff.status == "failed"
+    assert handoff.task_flow == "fix"
+    assert handoff.next_step
+    assert any(item == "task_flow=fix" for item in handoff.belief)
+    assert any(item.startswith("next=") for item in handoff.progress)
 
 
 def test_run_session_runs_validation_for_run_tests_request(tmp_path: Path) -> None:
@@ -806,7 +958,78 @@ def test_run_session_runs_validation_for_run_tests_request(tmp_path: Path) -> No
         in reason
         for reason in record.task_plan.reasons
     )
-    assert "approval is required" in record.final_report.lower()
+
+
+def test_run_session_writes_handoff_after_failed_validation(tmp_path: Path) -> None:
+    (tmp_path / "test_sample.py").write_text(
+        "def test_broken():\n    assert False\n",
+        encoding="utf-8",
+    )
+    store = SessionStore(tmp_path / "sessions")
+
+    record = run_session("run tests", tmp_path, store, auto_approve_commands=True)
+    handoff = store.load_handoff(record.session_id)
+
+    assert record.status.value == "failed"
+    assert handoff.reason == "validation_failed"
+    assert handoff.validation_summary.startswith("Validation failed via run_command")
+    assert handoff.blocker
+    assert any(item.startswith("validation=") for item in handoff.belief)
+    assert any(item.startswith("validation_state=") for item in handoff.progress)
+
+
+def test_run_session_writes_procedural_repair_after_failed_validation(tmp_path: Path) -> None:
+    (tmp_path / "test_sample.py").write_text(
+        "def test_broken():\n    assert False\n",
+        encoding="utf-8",
+    )
+    store = SessionStore(tmp_path / "sessions")
+
+    record = run_session("run tests", tmp_path, store, auto_approve_commands=True)
+    repairs = store.list_procedural_repair_records(task_class="fix")
+
+    assert record.status.value == "failed"
+    assert len(repairs) == 1
+    assert repairs[0].source_session_id == record.session_id
+    assert repairs[0].failure_pattern == "validation_failed"
+    assert repairs[0].status == "candidate"
+    assert repairs[0].validation_evidence
+
+
+def test_run_session_recalls_matching_procedural_repair_into_experience(tmp_path: Path) -> None:
+    (tmp_path / "test_sample.py").write_text(
+        "def test_broken():\n    assert False\n",
+        encoding="utf-8",
+    )
+    store = SessionStore(tmp_path / "sessions")
+
+    failed = run_session("run tests", tmp_path, store, auto_approve_commands=True)
+    recalled = run_session("run tests", tmp_path, store, auto_approve_commands=True)
+
+    assert any(event.kind == "repair_memory" for event in recalled.events)
+    assert any(
+        item.startswith(f"recalled_repair={failed.session_id}-validation-failed")
+        for item in recalled.working_memory.experience
+    )
+
+
+def test_run_session_recalls_accepted_procedural_repair_into_experience(tmp_path: Path) -> None:
+    (tmp_path / "test_sample.py").write_text(
+        "def test_broken():\n    assert False\n",
+        encoding="utf-8",
+    )
+    store = SessionStore(tmp_path / "sessions")
+
+    failed = run_session("run tests", tmp_path, store, auto_approve_commands=True)
+    repair_id = f"{failed.session_id}-validation-failed"
+    store.update_procedural_repair_status(repair_id, "accepted")
+    recalled = run_session("run tests", tmp_path, store, auto_approve_commands=True)
+
+    assert any(event.kind == "repair_memory" for event in recalled.events)
+    assert any(
+        item.startswith(f"recalled_repair={repair_id}")
+        for item in recalled.working_memory.experience
+    )
 
 
 def test_run_session_runs_validation_for_run_pytest_request(tmp_path: Path) -> None:
@@ -1055,6 +1278,11 @@ def test_saved_session_json_includes_proposal_and_evidence(tmp_path: Path) -> No
     assert payload["working_memory"]["task_flow"] == "fix"
     assert payload["working_memory"]["changed_files"] == ["calc.py"]
     assert "next_step" in payload["working_memory"]
+    assert any(item == "task_flow=fix" for item in payload["working_memory"]["belief"])
+    assert any(item.startswith("validation=") for item in payload["working_memory"]["belief"])
+    assert any(item == "changed=calc.py" for item in payload["working_memory"]["progress"])
+    assert any(item.startswith("validation_state=") for item in payload["working_memory"]["progress"])
+    assert any(item == "candidate_repairs=1" for item in payload["working_memory"]["experience"])
     assert payload["changed_files"] == ["calc.py"]
     assert "test_calc.py" in payload["inspected_files"]
     assert payload["candidate_proposals"][0]["file"] == "calc.py"
@@ -1932,6 +2160,63 @@ def test_run_session_resume_carries_prior_context(tmp_path: Path) -> None:
     assert second.working_memory.resume_context.startswith(f"from={first.session_id}")
     assert second.working_memory.task_flow == "inspect"
     assert second.working_memory.focus
+    assert any(item == "task_flow=inspect" for item in second.working_memory.belief)
+    assert any(item.startswith("next=") for item in second.working_memory.progress)
+    assert any(item == f"resumed_from={first.session_id}" for item in second.working_memory.experience)
+
+
+def test_run_session_resume_prefers_compact_context_when_available(tmp_path: Path) -> None:
+    (tmp_path / "README.md").write_text("project intro", encoding="utf-8")
+    store = SessionStore(tmp_path / "sessions")
+
+    first = run_session("summarize this repo", tmp_path, store)
+    compact_path = tmp_path / "sessions" / "compactions" / f"{first.session_id}.compact.json"
+    payload = json.loads(compact_path.read_text(encoding="utf-8"))
+    payload["inspected_files"] = ["compact-only.md"]
+    payload["belief"] = ["compact-belief"]
+    payload["progress"] = ["compact-progress"]
+    payload["experience"] = ["compact-experience"]
+    payload["summary"] = "compact-summary"
+    compact_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    second = run_session(
+        "summarize this repo again",
+        tmp_path,
+        store,
+        resume_from_session_id=first.session_id,
+    )
+
+    assert "compact-only.md" in second.inspected_files
+    assert any(event.kind == "compact_resume" for event in second.events)
+    assert "resumed_from_compact=" + first.session_id in second.working_memory.experience
+    assert "compact-experience" in second.working_memory.experience
+
+
+def test_run_session_resume_from_handoff_carries_bpe_context(tmp_path: Path) -> None:
+    (tmp_path / "README.md").write_text("project intro", encoding="utf-8")
+    (tmp_path / "test_sample.py").write_text(
+        "def test_ok():\n    assert 1 == 1\n",
+        encoding="utf-8",
+    )
+    store = SessionStore(tmp_path / "sessions")
+
+    failed = run_session("run the tests", tmp_path, store)
+    resumed = run_session(
+        "continue by summarizing this repo",
+        tmp_path,
+        store,
+        resume_from_handoff_id=failed.session_id,
+    )
+
+    assert resumed.status.value == "completed"
+    assert resumed.resumed_from_session_id == failed.session_id
+    assert any(event.kind == "handoff_resume" for event in resumed.events)
+    assert resumed.working_memory.resume_context.startswith(f"handoff={failed.session_id}")
+    assert any(
+        item == f"resumed_from_handoff={failed.session_id}"
+        for item in resumed.working_memory.experience
+    )
+    assert f"handoff_belief={failed.working_memory.belief[0]}" in resumed.working_summary
 
 
 def test_run_session_diagnose_flow_gathers_evidence_without_editing(tmp_path: Path) -> None:

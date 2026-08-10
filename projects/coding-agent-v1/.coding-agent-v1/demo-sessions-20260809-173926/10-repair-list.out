@@ -1,0 +1,2 @@
+repair_records: 1
+f19bfaa158a7456db6fb9134177c201d-approval-required: task_class=fix status=candidate failure_pattern=approval_required

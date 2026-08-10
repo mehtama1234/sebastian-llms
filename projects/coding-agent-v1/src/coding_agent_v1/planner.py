@@ -1,10 +1,60 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+import os
 from pathlib import Path
 import re
 
 from .models import TaskFlow, TaskFlowCandidate
 from .tools import is_ignored_path
+
+
+DEFAULT_PLANNER_STRATEGY = "deterministic_heuristic"
+MODEL_GUIDED_PLANNER_STRATEGY = "model_guided"
+MODEL_GUIDED_PLANNER_CONFIG_ENV = "CODING_AGENT_V1_MODEL_PLANNER_COMMAND"
+AVAILABLE_PLANNER_STRATEGIES = (DEFAULT_PLANNER_STRATEGY, MODEL_GUIDED_PLANNER_STRATEGY)
+
+
+@dataclass(slots=True, frozen=True)
+class PlannerBackend:
+    strategy: str
+    reason: str
+    command: str = ""
+
+
+class PlannerConfigurationError(ValueError):
+    """Raised before any tool action when a requested planner backend is not usable."""
+
+
+def resolve_planner_strategy(strategy: str | None = None) -> tuple[str, str]:
+    backend = resolve_planner_backend(strategy)
+    return backend.strategy, backend.reason
+
+
+def resolve_planner_backend(strategy: str | None = None) -> PlannerBackend:
+    selected = strategy or DEFAULT_PLANNER_STRATEGY
+    if selected not in AVAILABLE_PLANNER_STRATEGIES:
+        allowed = ", ".join(AVAILABLE_PLANNER_STRATEGIES)
+        raise ValueError(f"unsupported planner strategy '{selected}'; expected one of: {allowed}")
+    if selected == MODEL_GUIDED_PLANNER_STRATEGY:
+        configured_command = os.environ.get(MODEL_GUIDED_PLANNER_CONFIG_ENV, "").strip()
+        if not configured_command:
+            raise PlannerConfigurationError(
+                f"planner strategy '{selected}' requires {MODEL_GUIDED_PLANNER_CONFIG_ENV} "
+                "before planning can run; no tool action was taken"
+            )
+        return PlannerBackend(
+            strategy=selected,
+            reason=(
+                f"model-guided planner selected from {MODEL_GUIDED_PLANNER_CONFIG_ENV}; "
+                "output must validate against the stable TaskPlan contract"
+            ),
+            command=configured_command,
+        )
+    return PlannerBackend(
+        strategy=selected,
+        reason="deterministic heuristic planner selected as the safe eval-gated default",
+    )
 
 
 def append_task_flow_candidate(
@@ -265,6 +315,23 @@ def count_symbol_occurrences(workspace_root: Path, symbol: str) -> int:
             continue
         count += len(pattern.findall(text))
     return count
+
+
+def find_source_files_containing_symbol(workspace_root: Path, symbol: str) -> list[Path]:
+    matches: list[Path] = []
+    pattern = re.compile(rf"\b{re.escape(symbol)}\b")
+    for path in sorted(workspace_root.rglob("*.py")):
+        if is_ignored_path(path, workspace_root):
+            continue
+        if path.name.startswith("test_") or path.name.endswith("_test.py"):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if pattern.search(text):
+            matches.append(path)
+    return matches
 
 
 def rename_reason(symbol: str, match_count: int) -> str:

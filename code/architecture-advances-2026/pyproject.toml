@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "architecture-advances-2026"
+version = "0.1.0"
+description = "Small architecture experimentation harness for long-context LLM variants"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=2.5.0",
+]
+
+[project.optional-dependencies]
+hf = [
+  "huggingface_hub>=0.34.0",
+  "safetensors>=0.5.0",
+  "transformers>=4.51.0",
+]
+torch = [
+  "torch>=2.7.0",
+]
+
+[project.scripts]
+arch-adv-summary = "arch_adv_2026.cli:main"
+arch-adv-qwen-inspect = "arch_adv_2026.hf_reference:main"
+arch-adv-qwen-generate = "arch_adv_2026.hf_generate:main"
+arch-adv-qwen-eval = "arch_adv_2026.hf_eval:main"
+arch-adv-long-context-generate = "arch_adv_2026.long_context_generate_cli:main_generate"
+arch-adv-long-context-eval = "arch_adv_2026.long_context_eval_cli:main_eval"
+arch-adv-long-context-sweep = "arch_adv_2026.long_context_sweep_cli:main_sweep"
+arch-adv-long-context-report = "arch_adv_2026.long_context_report:main"
+arch-adv-long-context-project = "arch_adv_2026.long_context_projection:main"
+arch-adv-long-context-project-report = "arch_adv_2026.long_context_projection_report:main"
+arch-adv-long-context-compare = "arch_adv_2026.long_context_compare:main"
+arch-adv-long-context-variant-compare = "arch_adv_2026.long_context_variant_compare:main"
+arch-adv-long-context-variant-report = "arch_adv_2026.long_context_variant_report:main"
+arch-adv-long-context-variant-selector = "arch_adv_2026.long_context_variant_selector:main"
+arch-adv-long-context-variant-memo = "arch_adv_2026.long_context_variant_memo:main"
+arch-adv-long-context-followup-assessment = "arch_adv_2026.long_context_followup_assessment:main"
+arch-adv-long-context-variant-plan = "arch_adv_2026.long_context_variant_plan:main"
+arch-adv-long-context-variant-execute = "arch_adv_2026.long_context_variant_execute:main"
+arch-adv-long-context-plan = "arch_adv_2026.long_context_plan:main"
+arch-adv-long-context-execute = "arch_adv_2026.long_context_execute:main"
+arch-adv-long-context-matrix = "arch_adv_2026.long_context_matrix:main"
+arch-adv-training-benchmark = "arch_adv_2026.training_benchmark_cli:main"
+arch-adv-training-report = "arch_adv_2026.training_report_cli:main"
+arch-adv-training-matrix = "arch_adv_2026.training_matrix:main"
+arch-adv-final-memo = "arch_adv_2026.final_memo_cli:main"
+arch-adv-concept-scorecard = "arch_adv_2026.concept_scorecard:main"
+arch-adv-concept-decision-audit = "arch_adv_2026.concept_decision_audit:main"
+arch-adv-concept-review-plan = "arch_adv_2026.concept_review_plan:main"
+arch-adv-training-followup-assessment = "arch_adv_2026.training_followup_assessment:main"
+arch-adv-decision-stack = "arch_adv_2026.decision_stack:main"
+arch-adv-decision-stack-validate = "arch_adv_2026.decision_stack_validate:main"
+arch-adv-benchmark-matrix = "arch_adv_2026.benchmark_matrix:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

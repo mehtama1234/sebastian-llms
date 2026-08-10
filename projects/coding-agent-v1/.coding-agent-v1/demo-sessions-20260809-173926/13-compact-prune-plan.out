@@ -1,0 +1,9 @@
+compact_context_prune_plan: .coding-agent-v1/demo-sessions-20260809-173926
+keep_newest: 2
+include_size_triggered: False
+kept: 3
+prunable: 1
+.coding-agent-v1/demo-sessions-20260809-173926/compactions/5eb4b8e99fd54cf28ffbf12849c43f43.compact.json: action=keep session_id=5eb4b8e99fd54cf28ffbf12849c43f43 trigger=size_triggered:resume_checkpoint reason=within newest 2 compact context artifact(s)
+.coding-agent-v1/demo-sessions-20260809-173926/compactions/f19bfaa158a7456db6fb9134177c201d.compact.json: action=keep session_id=f19bfaa158a7456db6fb9134177c201d trigger=size_triggered:blocked_state reason=within newest 2 compact context artifact(s)
+.coding-agent-v1/demo-sessions-20260809-173926/compactions/b9aae2894ae24cd1bd157b46602db006.compact.json: action=keep session_id=b9aae2894ae24cd1bd157b46602db006 trigger=size_triggered:resume_checkpoint reason=size-triggered compaction is protected by default
+.coding-agent-v1/demo-sessions-20260809-173926/compactions/10ff5add1c974d2b93993818a75b7d63.compact.json: action=prune session_id=10ff5add1c974d2b93993818a75b7d63 trigger=checkpoint reason=older than newest 2 compact context artifact(s)

@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 from uuid import uuid4
+import subprocess
 import shlex
+import json
 import re
 
 from .models import (
+    CompactContextArtifact,
     PermissionOutcome,
+    HandoffArtifact,
+    ProceduralRepairRecord,
     RepairProposal,
     SessionRecord,
     SessionStatus,
@@ -17,6 +22,7 @@ from .models import (
     ToolResult,
     WorkingMemory,
 )
+from .behavior_index import infer_behavior_lookup
 from .planner import (
     append_task_flow_candidate,
     count_symbol_occurrences,
@@ -36,6 +42,7 @@ from .planner import (
     find_cli_parser_files,
     find_config_mapping_files,
     find_python_test_paths,
+    find_source_files_containing_symbol,
     fix_reason,
     inspect_reason,
     looks_like_diagnose_request,
@@ -44,6 +51,10 @@ from .planner import (
     looks_like_inspect_request,
     looks_like_test_failure_context,
     rename_reason,
+    DEFAULT_PLANNER_STRATEGY,
+    MODEL_GUIDED_PLANNER_STRATEGY,
+    PlannerConfigurationError,
+    resolve_planner_backend,
     select_task_flow_from_candidates,
     select_feature_strategy,
 )
@@ -131,6 +142,13 @@ def _choose_validation_command(
             matching_tests = _find_test_files_containing_patterns(test_paths, [old_name])
             if matching_tests:
                 return _build_pytest_command_for_paths(matching_tests, workspace_root)
+            related_tests = _find_test_files_for_source_modules(
+                test_paths,
+                workspace_root,
+                find_source_files_containing_symbol(workspace_root, old_name),
+            )
+            if related_tests:
+                return _build_pytest_command_for_paths(related_tests, workspace_root)
     python_tests = [path.relative_to(workspace_root) for path in test_paths]
     if not python_tests:
         return ""
@@ -215,6 +233,46 @@ def build_task_plan(
     request: str,
     workspace_root: Path,
     instruction_files: list[str],
+    *,
+    planner_strategy: str | None = None,
+) -> TaskPlan:
+    backend = resolve_planner_backend(planner_strategy)
+    baseline_strategy = (
+        DEFAULT_PLANNER_STRATEGY
+        if backend.strategy == MODEL_GUIDED_PLANNER_STRATEGY
+        else backend.strategy
+    )
+    baseline_reason = (
+        "deterministic heuristic planner computed as the model-guided baseline"
+        if backend.strategy == MODEL_GUIDED_PLANNER_STRATEGY
+        else backend.reason
+    )
+    baseline_plan = _build_deterministic_task_plan(
+        request,
+        workspace_root,
+        instruction_files,
+        planner_strategy=baseline_strategy,
+        planner_strategy_reason=baseline_reason,
+    )
+    if backend.strategy != MODEL_GUIDED_PLANNER_STRATEGY:
+        return baseline_plan
+    return _build_model_guided_task_plan(
+        request,
+        workspace_root,
+        instruction_files,
+        baseline_plan=baseline_plan,
+        command=backend.command,
+        planner_strategy_reason=backend.reason,
+    )
+
+
+def _build_deterministic_task_plan(
+    request: str,
+    workspace_root: Path,
+    instruction_files: list[str],
+    *,
+    planner_strategy: str,
+    planner_strategy_reason: str,
 ) -> TaskPlan:
     task_flow, flow_reasons, feature_strategy, feature_arguments, strategy_reason = _select_task_flow(
         request,
@@ -232,6 +290,23 @@ def build_task_plan(
         feature_strategy=feature_strategy,
         feature_arguments=feature_arguments,
     )
+    behavior_lookup = infer_behavior_lookup(
+        request,
+        workspace_root,
+        task_flow,
+        feature_strategy=feature_strategy,
+        validation_command=validation_command,
+    )
+    if behavior_lookup.behavior_ids:
+        reasons.append(
+            "behavior index selected affected behavior(s): "
+            + ", ".join(f"`{behavior_id}`" for behavior_id in behavior_lookup.behavior_ids)
+        )
+    if behavior_lookup.stale_behavior_ids:
+        reasons.append(
+            "behavior index has stale source anchor(s): "
+            + ", ".join(f"`{behavior_id}`" for behavior_id in behavior_lookup.stale_behavior_ids)
+        )
     if validation_command:
         reasons.append(
             _validation_reason(
@@ -256,12 +331,195 @@ def build_task_plan(
     )
     return TaskPlan(
         task_flow=task_flow,
+        planner_strategy=planner_strategy,
+        planner_strategy_reason=planner_strategy_reason,
         feature_strategy=feature_strategy,
         feature_arguments=feature_arguments,
+        affected_behavior_ids=behavior_lookup.behavior_ids,
+        implementation_surfaces=behavior_lookup.source_files,
         initial_actions=[action.name for action in initial_actions],
         validation_command=validation_command,
         reasons=reasons,
     )
+
+
+def _build_model_guided_task_plan(
+    request: str,
+    workspace_root: Path,
+    instruction_files: list[str],
+    *,
+    baseline_plan: TaskPlan,
+    command: str,
+    planner_strategy_reason: str,
+) -> TaskPlan:
+    payload = {
+        "request": request,
+        "workspace_root": str(workspace_root),
+        "instruction_files": instruction_files,
+        "deterministic_baseline": _task_plan_to_model_payload(baseline_plan),
+        "contract": {
+            "required_fields": ["task_flow", "reasons"],
+            "allowed_task_flows": [item.value for item in TaskFlow],
+            "optional_fields": ["feature_strategy", "feature_arguments"],
+            "note": "The harness recomputes behavior IDs, implementation surfaces, validation command, and initial actions.",
+        },
+    }
+    model_decision = _run_model_planner_command(command, payload)
+    task_flow = _parse_model_task_flow(model_decision)
+    reasons = _parse_model_reasons(model_decision)
+    feature_strategy = str(model_decision.get("feature_strategy", ""))
+    feature_arguments = _parse_model_feature_arguments(model_decision)
+    if task_flow is TaskFlow.FEATURE and not feature_strategy:
+        feature_strategy = baseline_plan.feature_strategy
+        feature_arguments = dict(baseline_plan.feature_arguments)
+        reasons.append("model planner omitted feature strategy; deterministic feature strategy was reused")
+    validation_command = _choose_validation_command(
+        request,
+        workspace_root,
+        task_flow,
+        feature_strategy=feature_strategy,
+        feature_arguments=feature_arguments,
+    )
+    behavior_lookup = infer_behavior_lookup(
+        request,
+        workspace_root,
+        task_flow,
+        feature_strategy=feature_strategy,
+        validation_command=validation_command,
+    )
+    if behavior_lookup.behavior_ids:
+        reasons.append(
+            "behavior index selected affected behavior(s): "
+            + ", ".join(f"`{behavior_id}`" for behavior_id in behavior_lookup.behavior_ids)
+        )
+    if validation_command:
+        reasons.append(
+            _validation_reason(
+                request,
+                workspace_root,
+                task_flow,
+                validation_command,
+                feature_strategy=feature_strategy,
+                feature_arguments=feature_arguments,
+            )
+        )
+    else:
+        reasons.append("no validation command selected for the current flow and workspace evidence")
+    initial_actions = build_initial_actions(
+        request,
+        workspace_root,
+        instruction_files,
+        task_flow,
+        feature_strategy=feature_strategy,
+        feature_arguments=feature_arguments,
+        validation_command=validation_command,
+    )
+    return TaskPlan(
+        task_flow=task_flow,
+        planner_strategy=MODEL_GUIDED_PLANNER_STRATEGY,
+        planner_strategy_reason=planner_strategy_reason,
+        feature_strategy=feature_strategy,
+        feature_arguments=feature_arguments,
+        affected_behavior_ids=behavior_lookup.behavior_ids,
+        implementation_surfaces=behavior_lookup.source_files,
+        initial_actions=[action.name for action in initial_actions],
+        validation_command=validation_command,
+        reasons=[
+            f"model planner command selected `{task_flow.value}` from validated JSON output",
+            f"deterministic baseline task_flow was `{baseline_plan.task_flow.value}`",
+            *reasons,
+        ],
+    )
+
+
+def _run_model_planner_command(command: str, payload: dict[str, object]) -> dict[str, object]:
+    try:
+        completed = subprocess.run(
+            shlex.split(command),
+            input=json.dumps(payload),
+            text=True,
+            capture_output=True,
+            timeout=20,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise PlannerConfigurationError(
+            f"model planner command failed before planning completed: {exc}; no tool action was taken"
+        ) from exc
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip() or f"exit code {completed.returncode}"
+        raise PlannerConfigurationError(
+            f"model planner command failed: {detail}; no tool action was taken"
+        )
+    try:
+        parsed = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise PlannerConfigurationError(
+            "model planner command did not return valid JSON on stdout; no tool action was taken"
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise PlannerConfigurationError(
+            "model planner command must return a JSON object; no tool action was taken"
+        )
+    return parsed
+
+
+def _parse_model_task_flow(model_decision: dict[str, object]) -> TaskFlow:
+    raw_task_flow = model_decision.get("task_flow")
+    if not isinstance(raw_task_flow, str):
+        raise PlannerConfigurationError(
+            "model planner output must include string field `task_flow`; no tool action was taken"
+        )
+    try:
+        return TaskFlow(raw_task_flow)
+    except ValueError as exc:
+        allowed = ", ".join(item.value for item in TaskFlow)
+        raise PlannerConfigurationError(
+            f"model planner output has unsupported task_flow `{raw_task_flow}`; expected one of: {allowed}; "
+            "no tool action was taken"
+        ) from exc
+
+
+def _parse_model_reasons(model_decision: dict[str, object]) -> list[str]:
+    raw_reasons = model_decision.get("reasons")
+    if isinstance(raw_reasons, str):
+        raw_reasons = [raw_reasons]
+    if not isinstance(raw_reasons, list) or not raw_reasons:
+        raise PlannerConfigurationError(
+            "model planner output must include non-empty `reasons`; no tool action was taken"
+        )
+    reasons = [str(item) for item in raw_reasons if str(item).strip()]
+    if not reasons:
+        raise PlannerConfigurationError(
+            "model planner output `reasons` must contain at least one non-empty item; no tool action was taken"
+        )
+    return reasons
+
+
+def _parse_model_feature_arguments(model_decision: dict[str, object]) -> dict[str, str]:
+    raw_arguments = model_decision.get("feature_arguments", {})
+    if raw_arguments is None:
+        return {}
+    if not isinstance(raw_arguments, dict):
+        raise PlannerConfigurationError(
+            "model planner output `feature_arguments` must be a JSON object; no tool action was taken"
+        )
+    return {str(key): str(value) for key, value in raw_arguments.items()}
+
+
+def _task_plan_to_model_payload(plan: TaskPlan) -> dict[str, object]:
+    return {
+        "task_flow": plan.task_flow.value,
+        "planner_strategy": plan.planner_strategy,
+        "planner_strategy_reason": plan.planner_strategy_reason,
+        "feature_strategy": plan.feature_strategy,
+        "feature_arguments": plan.feature_arguments,
+        "affected_behavior_ids": plan.affected_behavior_ids,
+        "implementation_surfaces": plan.implementation_surfaces,
+        "initial_actions": plan.initial_actions,
+        "validation_command": plan.validation_command,
+        "reasons": plan.reasons,
+    }
 
 
 def _validation_reason(
@@ -337,6 +595,13 @@ def _validation_reason(
             matching_tests = _find_test_files_containing_patterns(test_paths, [old_name])
             if matching_tests and _build_pytest_command_for_paths(matching_tests, workspace_root) == validation_command:
                 return f"selected validation command `{validation_command}` from matching rename target `{old_name}` test evidence"
+            related_tests = _find_test_files_for_source_modules(
+                test_paths,
+                workspace_root,
+                find_source_files_containing_symbol(workspace_root, old_name),
+            )
+            if related_tests and _build_pytest_command_for_paths(related_tests, workspace_root) == validation_command:
+                return f"selected validation command `{validation_command}` from module-aware rename test evidence"
     python_tests = [path.relative_to(workspace_root) for path in test_paths]
     if task_flow in {TaskFlow.FEATURE, TaskFlow.RENAME} and len(python_tests) == 1:
         single_test_command = _build_pytest_command_for_relative_paths(python_tests)
@@ -1155,13 +1420,38 @@ def _run_action(
     action: ToolRequest,
     *,
     auto_approve_commands: bool,
+    prior_record: SessionRecord | None = None,
+    prior_handoff: HandoffArtifact | None = None,
 ) -> tuple[bool, ToolResult | None]:
+    store.append_event(
+        record,
+        "tool_request",
+        json.dumps(
+            {
+                "name": action.name,
+                "kind": action.kind.value,
+                "target": action.target,
+                "args": action.args,
+            },
+            sort_keys=True,
+        ),
+    )
     permission = decide_permission(action, workspace_root)
     store.append_event(record, "permission", f"{action.name} -> {permission.value}")
     if permission is PermissionOutcome.DENY:
         record.status = SessionStatus.FAILED
         record.final_report = f"Tool request {action.name} was denied by workspace policy."
-        store.save(record)
+        _build_working_memory(record, None, prior_record, prior_handoff)
+        record.validation_summary = summarize_validation(None)
+        _save_procedural_repair_record(
+            store,
+            record,
+            trigger_condition=f"tool `{action.name}` was denied by workspace policy",
+            failure_pattern="permission_denied",
+            recommended_recovery="Review the requested tool target and keep future actions inside the workspace boundary.",
+        )
+        _save_session_record(store, record)
+        store.save_handoff(record, reason="permission_denied")
         return False, None
     if permission is PermissionOutcome.ASK and not auto_approve_commands:
         store.append_event(
@@ -1171,7 +1461,17 @@ def _run_action(
         )
         record.status = SessionStatus.FAILED
         record.final_report = f"Stopped before running {action.name}; approval is required."
-        store.save(record)
+        _build_working_memory(record, None, prior_record, prior_handoff)
+        record.validation_summary = summarize_validation(None)
+        _save_procedural_repair_record(
+            store,
+            record,
+            trigger_condition=f"tool `{action.name}` required approval",
+            failure_pattern="approval_required",
+            recommended_recovery="Request or provide approval before rerunning the command-dependent step.",
+        )
+        _save_session_record(store, record)
+        store.save_handoff(record, reason="approval_required")
         return False, None
     if permission is PermissionOutcome.ASK and auto_approve_commands:
         store.append_event(
@@ -1234,6 +1534,9 @@ def _build_working_memory(
     record: SessionRecord,
     validation_result: ToolResult | None,
     prior_record: SessionRecord | None,
+    prior_handoff: HandoffArtifact | None = None,
+    recalled_repairs: list[ProceduralRepairRecord] | None = None,
+    prior_compact_context: CompactContextArtifact | None = None,
 ) -> None:
     focus: list[str] = []
     if record.proposed_changes:
@@ -1263,6 +1566,10 @@ def _build_working_memory(
         resume_context = f"from={prior_record.session_id}"
         if prior_record.working_memory.next_step:
             resume_context += f" prior_next={prior_record.working_memory.next_step}"
+    elif prior_handoff is not None:
+        resume_context = f"handoff={prior_handoff.session_id}"
+        if prior_handoff.next_step:
+            resume_context += f" prior_next={prior_handoff.next_step}"
 
     record.working_memory.task_flow = record.task_flow.value
     record.working_memory.resume_context = resume_context
@@ -1271,7 +1578,140 @@ def _build_working_memory(
     record.working_memory.changed_files = record.changed_files[:4]
     record.working_memory.last_validation = summarize_validation(validation_result)
     record.working_memory.next_step = next_step
+    record.working_memory.belief = _build_belief_memory(record, validation_result)
+    record.working_memory.progress = _build_progress_memory(record, validation_result, next_step)
+    record.working_memory.experience = _build_experience_memory(
+        record,
+        prior_record,
+        prior_handoff,
+        recalled_repairs,
+        prior_compact_context,
+    )
     record.working_summary = summarize_working_memory(record.working_memory)
+
+
+def _build_belief_memory(
+    record: SessionRecord,
+    validation_result: ToolResult | None,
+) -> list[str]:
+    belief = [
+        f"task_flow={record.task_flow.value}",
+        f"workspace={record.workspace_root}",
+    ]
+    if record.task_plan is not None and record.task_plan.affected_behavior_ids:
+        belief.append(f"affected_behaviors={','.join(record.task_plan.affected_behavior_ids)}")
+    if record.inspected_files:
+        belief.append(f"inspected={','.join(record.inspected_files[:4])}")
+    validation_summary = summarize_validation(validation_result)
+    if validation_summary:
+        belief.append(f"validation={validation_summary}")
+    return belief[:6]
+
+
+def _build_progress_memory(
+    record: SessionRecord,
+    validation_result: ToolResult | None,
+    next_step: str,
+) -> list[str]:
+    progress: list[str] = []
+    if record.task_plan is not None and record.task_plan.initial_actions:
+        progress.append(f"initial_actions={','.join(record.task_plan.initial_actions)}")
+    if record.changed_files:
+        progress.append(f"changed={','.join(record.changed_files[:4])}")
+    validation_summary = summarize_validation(validation_result)
+    if validation_summary:
+        progress.append(f"validation_state={validation_summary}")
+    progress.append(f"next={next_step}")
+    return progress[:6]
+
+
+def _build_experience_memory(
+    record: SessionRecord,
+    prior_record: SessionRecord | None,
+    prior_handoff: HandoffArtifact | None = None,
+    recalled_repairs: list[ProceduralRepairRecord] | None = None,
+    prior_compact_context: CompactContextArtifact | None = None,
+) -> list[str]:
+    experience: list[str] = []
+    for repair in (recalled_repairs or [])[:2]:
+        experience.append(f"recalled_repair={repair.repair_id}:{repair.failure_pattern}")
+    if prior_compact_context is not None:
+        experience.append(f"resumed_from_compact={prior_compact_context.session_id}")
+        if prior_compact_context.experience:
+            experience.extend(prior_compact_context.experience[:2])
+    if prior_record is not None:
+        experience.append(f"resumed_from={prior_record.session_id}")
+        if prior_record.working_memory.experience:
+            experience.extend(prior_record.working_memory.experience[:2])
+    if prior_handoff is not None:
+        experience.append(f"resumed_from_handoff={prior_handoff.session_id}")
+        if prior_handoff.belief:
+            experience.append(f"handoff_belief={prior_handoff.belief[0]}")
+        if prior_handoff.progress:
+            experience.append(f"handoff_progress={prior_handoff.progress[-1]}")
+        if prior_handoff.experience:
+            experience.extend(prior_handoff.experience[:2])
+    if record.candidate_proposals:
+        experience.append(f"candidate_repairs={len(record.candidate_proposals)}")
+    if record.task_plan is not None:
+        for reason in record.task_plan.reasons:
+            if "module-aware" in reason or "fallback" in reason:
+                experience.append(reason)
+                break
+    return experience[:6]
+
+
+def _build_procedural_repair_record(
+    record: SessionRecord,
+    *,
+    trigger_condition: str,
+    failure_pattern: str,
+    recommended_recovery: str,
+) -> ProceduralRepairRecord:
+    affected_behavior_ids: list[str] = []
+    if record.task_plan is not None:
+        affected_behavior_ids = list(record.task_plan.affected_behavior_ids)
+    source_evidence = list(record.inspected_files[:4])
+    if record.changed_files:
+        source_evidence.extend(f"changed:{path}" for path in record.changed_files[:4])
+    validation_evidence: list[str] = []
+    if record.validation_summary:
+        validation_evidence.append(record.validation_summary)
+    if record.final_report:
+        validation_evidence.append(record.final_report[:500])
+    repair_id = f"{record.session_id}-{failure_pattern.replace('_', '-')}"
+    return ProceduralRepairRecord(
+        repair_id=repair_id,
+        source_session_id=record.session_id,
+        task_class=record.task_flow.value,
+        trigger_condition=trigger_condition,
+        failure_pattern=failure_pattern,
+        recommended_recovery=recommended_recovery,
+        source_evidence=source_evidence,
+        validation_evidence=validation_evidence,
+        affected_behavior_ids=affected_behavior_ids,
+        support_count=1,
+        status="candidate",
+    )
+
+
+def _save_procedural_repair_record(
+    store: SessionStore,
+    record: SessionRecord,
+    *,
+    trigger_condition: str,
+    failure_pattern: str,
+    recommended_recovery: str,
+) -> ProceduralRepairRecord:
+    repair = _build_procedural_repair_record(
+        record,
+        trigger_condition=trigger_condition,
+        failure_pattern=failure_pattern,
+        recommended_recovery=recommended_recovery,
+    )
+    store.save_procedural_repair_record(repair)
+    store.append_event(record, "procedural_repair", f"candidate={repair.repair_id}")
+    return repair
 
 
 def _build_final_report(record: SessionRecord, validation_result: ToolResult | None) -> str:
@@ -1306,51 +1746,134 @@ def run_session(
     *,
     auto_approve_commands: bool = False,
     resume_from_session_id: str | None = None,
+    resume_from_handoff_id: str | None = None,
+    planner_strategy: str | None = None,
 ) -> SessionRecord:
     workspace = build_workspace_summary(start_path)
-    task_plan = build_task_plan(request, workspace.root, workspace.instruction_files)
+    task_plan = build_task_plan(
+        request,
+        workspace.root,
+        workspace.instruction_files,
+        planner_strategy=planner_strategy,
+    )
     task_flow = task_plan.task_flow
     prior_record: SessionRecord | None = None
+    prior_handoff: HandoffArtifact | None = None
+    prior_compact_context: CompactContextArtifact | None = None
     if resume_from_session_id is not None:
         prior_record = store.load(resume_from_session_id)
+        prior_compact_context = store.maybe_load_compact_context(resume_from_session_id)
         _inherit_resume_validation_command(request, task_plan, prior_record)
+    if resume_from_handoff_id is not None:
+        prior_handoff = store.load_handoff(resume_from_handoff_id)
+    accepted_repairs = store.list_procedural_repair_records(
+        task_class=task_flow.value,
+        status="accepted",
+    )
+    candidate_repairs = store.list_procedural_repair_records(
+        task_class=task_flow.value,
+        status="candidate",
+    )
+    recalled_repairs = (accepted_repairs + candidate_repairs)[:2]
     record = SessionRecord(
         session_id=uuid4().hex,
         request=request,
         workspace_root=workspace.root,
         task_flow=task_flow,
         task_plan=task_plan,
-        resumed_from_session_id=resume_from_session_id,
+        resumed_from_session_id=resume_from_session_id or resume_from_handoff_id,
     )
     if prior_record is not None:
-        record.inspected_files = list(prior_record.inspected_files)
-        record.changed_files = list(prior_record.changed_files)
+        if prior_compact_context is not None:
+            record.inspected_files = list(prior_compact_context.inspected_files)
+            record.changed_files = list(prior_compact_context.changed_files)
+            record.working_memory = WorkingMemory(
+                task_flow=prior_compact_context.task_flow,
+                resume_context=f"compact={prior_compact_context.session_id}",
+                focus=list(prior_compact_context.affected_behavior_ids[:4]),
+                inspected_files=list(prior_compact_context.inspected_files[:4]),
+                changed_files=list(prior_compact_context.changed_files[:4]),
+                last_validation=prior_compact_context.validation_summary,
+                next_step=prior_compact_context.next_step,
+                belief=list(prior_compact_context.belief),
+                progress=list(prior_compact_context.progress),
+                experience=list(prior_compact_context.experience),
+            )
+            record.working_summary = prior_compact_context.summary or summarize_working_memory(record.working_memory)
+        else:
+            record.inspected_files = list(prior_record.inspected_files)
+            record.changed_files = list(prior_record.changed_files)
+            record.working_memory = WorkingMemory(
+                task_flow=prior_record.working_memory.task_flow,
+                resume_context=prior_record.working_memory.resume_context,
+                focus=list(prior_record.working_memory.focus),
+                inspected_files=list(prior_record.working_memory.inspected_files),
+                changed_files=list(prior_record.working_memory.changed_files),
+                last_validation=prior_record.working_memory.last_validation,
+                next_step=prior_record.working_memory.next_step,
+                belief=list(prior_record.working_memory.belief),
+                progress=list(prior_record.working_memory.progress),
+                experience=list(prior_record.working_memory.experience),
+            )
+            record.working_summary = prior_record.working_summary
         record.rationale = list(prior_record.rationale)
-        record.working_memory = WorkingMemory(
-            task_flow=prior_record.working_memory.task_flow,
-            resume_context=prior_record.working_memory.resume_context,
-            focus=list(prior_record.working_memory.focus),
-            inspected_files=list(prior_record.working_memory.inspected_files),
-            changed_files=list(prior_record.working_memory.changed_files),
-            last_validation=prior_record.working_memory.last_validation,
-            next_step=prior_record.working_memory.next_step,
-        )
-        record.working_summary = prior_record.working_summary
         store.append_event(
             record,
             "resume",
             f"resumed_from={prior_record.session_id} prior_status={prior_record.status.value}",
         )
+        if prior_compact_context is not None:
+            store.append_event(
+                record,
+                "compact_resume",
+                f"resumed_from_compact={prior_compact_context.session_id}",
+            )
+        resume_source = (
+            "its compact continuation state"
+            if prior_compact_context is not None
+            else "its inspected files, changed files, and working summary"
+        )
+        _append_rationale(
+            record,
+            f"Resumed from prior session `{prior_record.session_id}` after reviewing {resume_source}.",
+        )
+    elif prior_handoff is not None:
+        record.inspected_files = list(prior_handoff.inspected_files)
+        record.changed_files = list(prior_handoff.changed_files)
+        record.working_memory = WorkingMemory(
+            task_flow=prior_handoff.task_flow,
+            resume_context=f"handoff={prior_handoff.session_id}",
+            focus=list(prior_handoff.affected_behavior_ids[:4]),
+            inspected_files=list(prior_handoff.inspected_files[:4]),
+            changed_files=list(prior_handoff.changed_files[:4]),
+            last_validation=prior_handoff.validation_summary,
+            next_step=prior_handoff.next_step,
+            belief=list(prior_handoff.belief),
+            progress=list(prior_handoff.progress),
+            experience=list(prior_handoff.experience),
+        )
+        record.working_summary = summarize_working_memory(record.working_memory)
+        store.append_event(
+            record,
+            "handoff_resume",
+            f"resumed_from_handoff={prior_handoff.session_id} reason={prior_handoff.reason}",
+        )
         _append_rationale(
             record,
             (
-                f"Resumed from prior session `{prior_record.session_id}` after reviewing "
-                f"its inspected files, changed files, and working summary."
+                f"Resumed from handoff `{prior_handoff.session_id}` after reviewing "
+                f"its blocker and BPE continuation state."
             ),
         )
     store.append_event(record, "request", request)
     store.append_event(record, "task_flow", task_flow.value)
     store.append_event(record, "task_plan", summarize_task_plan(task_plan))
+    if recalled_repairs:
+        store.append_event(
+            record,
+            "repair_memory",
+            "recalled=" + ",".join(repair.repair_id for repair in recalled_repairs),
+        )
     store.append_event(
         record,
         "workspace",
@@ -1380,6 +1903,8 @@ def run_session(
             workspace.root,
             action,
             auto_approve_commands=auto_approve_commands,
+            prior_record=prior_record,
+            prior_handoff=prior_handoff,
         )
         if not ok:
             return record
@@ -1404,6 +1929,8 @@ def run_session(
                     workspace.root,
                     follow_up_action,
                     auto_approve_commands=auto_approve_commands,
+                    prior_record=prior_record,
+                    prior_handoff=prior_handoff,
                 )
                 if not ok:
                     return record
@@ -1454,6 +1981,8 @@ def run_session(
                     workspace.root,
                     repair_action,
                     auto_approve_commands=auto_approve_commands,
+                    prior_record=prior_record,
+                    prior_handoff=prior_handoff,
                 )
                 if not ok:
                     return record
@@ -1488,6 +2017,8 @@ def run_session(
                     workspace.root,
                     rename_action,
                     auto_approve_commands=auto_approve_commands,
+                    prior_record=prior_record,
+                    prior_handoff=prior_handoff,
                 )
                 if not ok:
                     return record
@@ -1527,6 +2058,8 @@ def run_session(
                     workspace.root,
                     feature_action,
                     auto_approve_commands=auto_approve_commands,
+                    prior_record=prior_record,
+                    prior_handoff=prior_handoff,
                 )
                 if not ok:
                     return record
@@ -1567,6 +2100,8 @@ def run_session(
                     workspace.root,
                     feature_action,
                     auto_approve_commands=auto_approve_commands,
+                    prior_record=prior_record,
+                    prior_handoff=prior_handoff,
                 )
                 if not ok:
                     return record
@@ -1613,6 +2148,8 @@ def run_session(
                     workspace.root,
                     feature_action,
                     auto_approve_commands=auto_approve_commands,
+                    prior_record=prior_record,
+                    prior_handoff=prior_handoff,
                 )
                 if not ok:
                     return record
@@ -1628,7 +2165,14 @@ def run_session(
                 ),
             )
 
-    _build_working_memory(record, validation_result, prior_record)
+    _build_working_memory(
+        record,
+        validation_result,
+        prior_record,
+        prior_handoff,
+        recalled_repairs,
+        prior_compact_context,
+    )
     record.validation_summary = summarize_validation(validation_result)
     record.final_report = _build_final_report(record, validation_result)
     if validation_result is not None and not validation_result.ok:
@@ -1639,8 +2183,23 @@ def run_session(
         record.status = SessionStatus.FAILED
     else:
         record.status = SessionStatus.COMPLETED
-    store.save(record)
+    _save_session_record(store, record)
+    if record.status is SessionStatus.FAILED:
+        _save_procedural_repair_record(
+            store,
+            record,
+            trigger_condition="validation command completed with a failing result",
+            failure_pattern="validation_failed",
+            recommended_recovery="Inspect validation output, preserve the selected validation command, and continue from the recorded failure hints.",
+        )
+        _save_session_record(store, record)
+        store.save_handoff(record, reason="validation_failed")
     return record
+
+
+def _save_session_record(store: SessionStore, record: SessionRecord) -> None:
+    store.save(record)
+    store.save_compact_context(record)
 
 
 def _inherit_resume_validation_command(

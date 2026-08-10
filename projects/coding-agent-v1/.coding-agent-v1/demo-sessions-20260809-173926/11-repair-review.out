@@ -1,0 +1,11 @@
+repair_id: f19bfaa158a7456db6fb9134177c201d-approval-required
+source_session_id: f19bfaa158a7456db6fb9134177c201d
+status: candidate
+task_class: fix
+trigger_condition: tool `run_command` required approval
+failure_pattern: approval_required
+recommended_recovery: Request or provide approval before rerunning the command-dependent step.
+support_count: 1
+affected_behaviors: task_planning, validation_selection
+source_evidence: README.md
+validation_evidence: No validation was run.; Stopped before running run_command; approval is required.
