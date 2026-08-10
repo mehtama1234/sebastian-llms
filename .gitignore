@@ -3,6 +3,9 @@
 *.json
 *.jsonl
 
+# Large local model/parity artifacts
+code/qwen3-parity/artifacts/parity/
+
 # Local Python environments and caches
 .venv/
 __pycache__/
