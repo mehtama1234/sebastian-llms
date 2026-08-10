@@ -91,8 +91,10 @@ As of Sunday, August 9, 2026, the current local test suite for `coding-agent-v1`
 - `projects/`: concrete project briefs and checklists derived from the notes
 - `evals/`: evaluation plans, task sets, and benchmark notes
 - `docs/coding-agents/`: longer-form canonical writeups for the current focus area
+- `docs/agent-evals/`: canonical writeups for tool use, multi-step traces, runtime checks, and complex-agent evaluation
 - `docs/architecture-advances-2026/`: canonical writeups for long-context architecture efficiency ideas from `LLMArchitectureAdvances2026.pdf`
 - `docs/qwen3-from-scratch/`: canonical writeups for the Qwen3 implementation track
+- `evals/agent-evals/`: benchmark plans, rubrics, dataset notes, and scenario-pack shape for the agent-evaluation track
 - `code/qwen3-parity/`: implementation workspace for the reference-vs-scratch Qwen3 project
 
 ## Source Documents
@@ -127,12 +129,20 @@ The external Decoding AI course adds a third layer:
 
 The repo should therefore separate durable architecture notes from operational setup notes.
 
+There is now also a separate agent-evaluation lane for turning the "how do we evaluate real agents?" question into concrete repo work around:
+
+- tool-call grading
+- multi-step trace debugging
+- runtime safety checks
+- document and multimodal agent evaluation
+
 ## Next Steps
 
 1. Convert `OpenCodingAgents.pdf` into a second note focused on local stack decisions, risks, and evaluation criteria.
 2. Flesh out `docs/architecture-advances-2026/`, `projects/architecture-advances-2026/`, and `evals/architecture-advances-2026/` into concrete prototype specs.
 3. Convert `Qwen3fromscratch.pdf` into a durable implementation note and drive a Qwen3 0.6B parity project from it.
-4. Normalize PDF naming and move source files under `sources/pdfs/` once references are updated.
-5. Add an initial evaluation matrix for harnesses, models, permissions, and task success.
-6. Use `projects/coding-agent-from-scratch-implementation-map.md` as the bridge from the PDF concepts to a real codebase structure.
-7. Extend `projects/coding-agent-v1/` from single-bug repair into broader tasks like small feature work, safe renames, and richer session resume flows.
+4. Build the new `docs/agent-evals/`, `projects/agent-evals/`, and `evals/agent-evals/` lane into runnable datasets, rubrics, and evaluators, with `projects/coding-agent-v1/` as the first integration target.
+5. Normalize PDF naming and move source files under `sources/pdfs/` once references are updated.
+6. Add an initial evaluation matrix for harnesses, models, permissions, and task success.
+7. Use `projects/coding-agent-from-scratch-implementation-map.md` as the bridge from the PDF concepts to a real codebase structure.
+8. Extend `projects/coding-agent-v1/` from single-bug repair into broader tasks like small feature work, safe renames, and richer session resume flows.
