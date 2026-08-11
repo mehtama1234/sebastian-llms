@@ -7,9 +7,13 @@ answers that question by measurement instead of taste.
 
 Read them in order, or jump to the experiment you care about.
 
-**Also here:** [DeepSeek V3 → V3.2, illustrated](deepseek-illustrated.html) — a picture-first walk
-through Raschka's DeepSeek review, with detailed SVG diagrams for MLA, DSA sparse attention, the
-generator/verifier/meta-verifier setup, self-refinement, RL reward routing, and mHC.
+**Also here:**
+- [DeepSeek V3 → V3.2, illustrated](deepseek-illustrated.html) — a picture-first walk through Raschka's
+  DeepSeek review, with detailed SVG diagrams for MLA, DSA sparse attention, the
+  generator/verifier/meta-verifier setup, self-refinement, RL reward routing, and mHC.
+- [DeepSeek deeper — training internals](deepseek-deeper.html) — the companion "under the hood" page:
+  how the verifier stack and the sparse-attention indexer actually get trained, the signals that flow,
+  and the outside fields (retrieval, MoE routing, pruning, bandits) that give the best intuition.
 
 1. [Why this lab exists and how it works](01-why-this-lab-exists.md)
 2. [How the benchmark actually works](02-how-the-benchmark-works.md)

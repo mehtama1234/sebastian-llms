@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeepSeek deeper — how the verifier stack and the indexer get trained</title>
+<style>
+:root { --ink:#1f2328; --muted:#59636e; --line:#d8dee4; --accent:#8a5a2b; --bg:#fbf9f6; --card:#fff; --code:#f3efe9; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
+.wrap { display:flex; max-width:1180px; margin:0 auto; }
+nav { width:250px; flex:none; padding:32px 18px; border-right:1px solid var(--line);
+  position:sticky; top:0; align-self:flex-start; height:100vh; overflow:auto; }
+nav h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 14px; }
+nav a { display:block; padding:6px 10px; margin:2px 0; border-radius:7px; color:var(--ink); text-decoration:none; font-size:14px; }
+nav a:hover { background:var(--code); }
+nav a.active { background:var(--accent); color:#fff; }
+nav .sec { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:16px 0 4px 10px; }
+main { flex:1; min-width:0; padding:40px 52px 90px; }
+article { max-width:780px; }
+h1 { font-size:31px; line-height:1.2; margin:0 0 8px; }
+.lede { color:var(--muted); font-size:17px; margin:0 0 28px; }
+h2 { font-size:23px; margin:44px 0 12px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+h3 { font-size:17px; margin:28px 0 8px; }
+p { margin:13px 0; }
+a { color:var(--accent); }
+ul,ol { padding-left:22px; } li { margin:5px 0; }
+code { background:var(--code); padding:2px 6px; border-radius:5px; font-size:14px; font-family:ui-monospace,Menlo,Consolas,monospace; }
+.callout { background:#faf3ea; border-left:4px solid var(--accent); padding:12px 16px 12px 18px; border-radius:0 8px 8px 0; margin:20px 0; }
+.callout strong { color:var(--accent); }
+.plain { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 18px; margin:16px 0; }
+.plain b { color:var(--accent); }
+table.cmp { border-collapse:collapse; width:100%; margin:20px 0; font-size:14px; }
+table.cmp th, table.cmp td { border:1px solid var(--line); padding:9px 12px; text-align:left; vertical-align:top; }
+table.cmp thead th { background:var(--code); }
+table.cmp td:first-child { font-weight:600; white-space:nowrap; color:var(--accent); }
+figure { margin:26px 0; padding:20px 20px 8px; background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:0 1px 2px rgba(0,0,0,.03); }
+figure svg { width:100%; height:auto; display:block; }
+figcaption { margin:14px 4px 8px; font-size:14px; color:var(--muted); }
+figcaption b { color:var(--ink); }
+.bx { fill:#fff; stroke:#c9cdd2; stroke-width:1.5; }
+.bxa { fill:#faf3ea; stroke:var(--accent); stroke-width:1.5; }
+.bxd { fill:#2b2620; stroke:#2b2620; }
+.bxg { fill:#f3efe9; stroke:#c9cdd2; stroke-width:1.5; }
+text.t { fill:#1f2328; font:600 13px -apple-system,system-ui,sans-serif; }
+text.tc{ fill:#1f2328; font:600 13px -apple-system,system-ui,sans-serif; text-anchor:middle; }
+text.s { fill:#59636e; font:11.5px ui-monospace,monospace; }
+text.sc{ fill:#59636e; font:11.5px ui-monospace,monospace; text-anchor:middle; }
+text.w { fill:#f5efe6; font:600 13px system-ui,sans-serif; text-anchor:middle; }
+text.a { fill:#8a5a2b; font:600 12px ui-monospace,monospace; }
+text.ac{ fill:#8a5a2b; font:600 12px ui-monospace,monospace; text-anchor:middle; }
+.ln { stroke:#8a5a2b; stroke-width:2; fill:none; marker-end:url(#ar); }
+.lnq{ stroke:#b9bdc2; stroke-width:1.6; fill:none; stroke-dasharray:5 4; marker-end:url(#arq); }
+@media (max-width:860px){ .wrap{flex-direction:column;} nav{width:auto;height:auto;position:static;
+  border-right:none;border-bottom:1px solid var(--line);} main{padding:26px 20px 60px;} }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0 0L10 5L0 10z" fill="#8a5a2b"/></marker>
+<marker id="arq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0 0L10 5L0 10z" fill="#b9bdc2"/></marker>
+</defs></svg>
+
+<div class="wrap">
+<nav>
+<h2>2026 LLM lab</h2>
+<a href="index.html">Home</a>
+<a href="deepseek-illustrated.html">DeepSeek V3 → V3.2 · illustrated</a>
+<a href="deepseek-deeper.html" class="active">DeepSeek deeper · training internals</a>
+<div class="sec">The lab series</div>
+<a href="01-why-this-lab-exists.html">1. Why this lab exists</a>
+<a href="02-how-the-benchmark-works.html">2. How the benchmark works</a>
+<a href="03-retrieval-grep-vs-vector.html">3. Retrieval</a>
+<a href="04-context-delivery.html">4. Context delivery</a>
+<a href="05-repo-instructions.html">5. Repo instructions</a>
+<a href="06-verifier-and-bluffing.html">6. The verifier</a>
+<a href="07-test-time-scaling.html">7. Test-time scaling</a>
+<a href="08-putting-it-together.html">8. Putting it together</a>
+</nav>
+
+<main><article>
+<h1>DeepSeek, deeper: how the pieces actually get trained</h1>
+<p class="lede">This goes past the article into the practical mechanics: what the verifier and meta-verifier
+likely look like and what signals flow during training, and how the sparse-attention indexer gets good —
+with the outside fields that give the best intuition.</p>
+<p>Companion to <a href="deepseek-illustrated.html">the illustrated overview</a>. Two parts:
+(1) the verifier stack in practice, (2) the indexer in practice.</p>
+
+<h2>Part 1 · The verifier and meta-verifier in practice</h2>
+<div class="callout"><strong>First, a myth to drop.</strong> The three roles do not have to be different
+architectures. In many systems they are just <b>differently fine-tuned versions of similar base models</b>,
+with different training data and reward objectives. "Three models" means three jobs, not three network designs.</div>
+
+<h3>What the verifier sees, and outputs</h3>
+<figure>
+<svg viewBox="0 0 760 210" role="img" aria-label="Verifier inputs and outputs">
+  <rect class="bx" x="20" y="24" width="150" height="40" rx="8"/><text class="tc" x="95" y="49">problem</text>
+  <rect class="bx" x="20" y="80" width="150" height="40" rx="8"/><text class="tc" x="95" y="105">candidate proof</text>
+  <rect class="bx" x="20" y="136" width="150" height="40" rx="8"/><text class="tc" x="95" y="161">rubric</text>
+  <path class="ln" d="M170 100 H286"/>
+  <rect class="bxa" x="290" y="62" width="170" height="86" rx="12"/>
+  <text class="tc" x="375" y="98">VERIFIER</text><text class="sc" x="375" y="118">analyze → then score</text>
+  <path class="ln" d="M460 104 H578"/>
+  <rect class="bx" x="580" y="20" width="170" height="38" rx="8"/><text class="tc" x="665" y="44">score 0 / ½ / 1</text>
+  <rect class="bx" x="580" y="72" width="170" height="38" rx="8"/><text class="tc" x="665" y="96">critique / justification</text>
+  <rect class="bx" x="580" y="124" width="170" height="66" rx="8"/><text class="tc" x="665" y="146">structured labels</text>
+  <text class="sc" x="665" y="164">missing step · unsupported</text><text class="sc" x="665" y="180">leap · arithmetic · format</text>
+</svg>
+<figcaption><b>Not "just give a number."</b> The strong version generates an <b>analysis first</b>, then maps it
+to a score — which makes the judgment inspectable. It can be built as a classifier, a regressor, a critique
+generator plus scorer, or a joint score-and-explanation model.</figcaption>
+</figure>
+
+<h3>What the meta-verifier sees — it judges the judge</h3>
+<figure>
+<svg viewBox="0 0 760 236" role="img" aria-label="Meta-verifier inputs and its target">
+  <rect class="bx"  x="20" y="18"  width="180" height="34" rx="8"/><text class="tc" x="110" y="40">problem</text>
+  <rect class="bx"  x="20" y="60"  width="180" height="34" rx="8"/><text class="tc" x="110" y="82">candidate proof</text>
+  <rect class="bxa" x="20" y="102" width="180" height="34" rx="8"/><text class="tc" x="110" y="124">verifier's critique</text>
+  <rect class="bxa" x="20" y="144" width="180" height="34" rx="8"/><text class="tc" x="110" y="166">verifier's score</text>
+  <rect class="bx"  x="20" y="186" width="180" height="34" rx="8"/><text class="tc" x="110" y="208">(rubric)</text>
+  <path class="ln" d="M200 119 H316"/>
+  <rect class="bxd" x="318" y="84" width="180" height="72" rx="12"/>
+  <text class="w" x="408" y="114">META-VERIFIER</text><text class="w" x="408" y="134" style="font-size:11px">judges the judge</text>
+  <path class="ln" d="M498 119 H616"/>
+  <rect class="bxg" x="618" y="66" width="132" height="106" rx="10"/>
+  <text class="tc" x="684" y="92">is the</text><text class="tc" x="684" y="110">evaluation</text><text class="tc" x="684" y="128">sound?</text>
+  <text class="sc" x="684" y="150">missed vs imagined</text><text class="sc" x="684" y="164">flaw · fair score?</text>
+</svg>
+<figcaption><b>A different target.</b> The meta-verifier's job is not "is the proof correct?" It is "is the
+<b>verifier's evaluation</b> correct and useful?" (the accent inputs are the verifier's own outputs). That one
+shift — evaluating the evaluation — is what keeps a noisy judge from quietly corrupting everything downstream.</figcaption>
+</figure>
+
+<h3>What gets trained against what</h3>
+<figure>
+<svg viewBox="0 0 760 250" role="img" aria-label="Three training loops: verifier, meta-verifier, generator">
+  <!-- A -->
+  <rect class="bxa" x="16" y="20" width="228" height="30" rx="8"/><text class="tc" x="130" y="40">A · train VERIFIER</text>
+  <rect class="bx" x="16" y="62"  width="228" height="46" rx="8"/><text class="sc" x="130" y="82">in: problem + proof</text><text class="sc" x="130" y="99">rubric</text>
+  <path class="ln" d="M130 108 V126"/>
+  <rect class="bx" x="16" y="128" width="228" height="40" rx="8"/><text class="sc" x="130" y="153">target: human score + critique</text>
+  <path class="ln" d="M130 168 V186"/>
+  <rect class="bxg" x="16" y="188" width="228" height="44" rx="8"/><text class="sc" x="130" y="207">reward: match gold ·</text><text class="sc" x="130" y="223">stay rubric-aligned</text>
+  <!-- B -->
+  <rect class="bxa" x="266" y="20" width="228" height="30" rx="8"/><text class="tc" x="380" y="40">B · train META</text>
+  <rect class="bx" x="266" y="62"  width="228" height="46" rx="8"/><text class="sc" x="380" y="82">in: problem + proof</text><text class="sc" x="380" y="99">+ verifier's output</text>
+  <path class="ln" d="M380 108 V126"/>
+  <rect class="bx" x="266" y="128" width="228" height="40" rx="8"/><text class="sc" x="380" y="153">target: was judgment sound?</text>
+  <path class="ln" d="M380 168 V186"/>
+  <rect class="bxg" x="266" y="188" width="228" height="44" rx="8"/><text class="sc" x="380" y="207">reward: match expert audit ·</text><text class="sc" x="380" y="223">punish false / missed flaws</text>
+  <!-- C -->
+  <rect class="bxa" x="516" y="20" width="228" height="30" rx="8"/><text class="tc" x="630" y="40">C · train GENERATOR</text>
+  <rect class="bx" x="516" y="62"  width="228" height="46" rx="8"/><text class="sc" x="630" y="82">in: problem</text><text class="sc" x="630" y="99">out: proof</text>
+  <path class="ln" d="M630 108 V126"/>
+  <rect class="bx" x="516" y="128" width="228" height="40" rx="8"/><text class="sc" x="630" y="153">graded by verifier + meta</text>
+  <path class="ln" d="M630 168 V186"/>
+  <rect class="bxg" x="516" y="188" width="228" height="44" rx="8"/><text class="sc" x="630" y="207">reward: not just answer-right,</text><text class="sc" x="630" y="223">but "judged rigorous"</text>
+</svg>
+<figcaption><b>Three loops, three targets.</b> The verifier learns to match expert scores; the meta-verifier
+learns "evaluation of evaluations"; the generator is rewarded for proofs a <b>trusted</b> evaluator calls
+rigorous — not just for a lucky final answer.</figcaption>
+</figure>
+
+<h3>The signal the generator actually gets</h3>
+<figure>
+<svg viewBox="0 0 760 130" role="img" aria-label="Generator reward decomposition">
+  <rect x="20"  y="40" width="140" height="46" rx="6" class="bxa"/><text class="tc" x="90"  y="68">correctness</text>
+  <text class="ac" x="168" y="68">+</text>
+  <rect x="184" y="40" width="130" height="46" rx="6" class="bxa"/><text class="tc" x="249" y="68">verifier score</text>
+  <text class="ac" x="322" y="68">+</text>
+  <rect x="338" y="40" width="130" height="46" rx="6" class="bxa"/><text class="tc" x="403" y="68">meta confidence</text>
+  <text class="ac" x="476" y="68">+</text>
+  <rect x="492" y="40" width="120" height="46" rx="6" class="bxa"/><text class="tc" x="552" y="68">refine gain</text>
+  <text class="ac" x="620" y="68">−</text>
+  <rect x="636" y="40" width="110" height="46" rx="6" class="bxg"/><text class="tc" x="691" y="68">penalties</text>
+  <text class="sc" x="380" y="112">shape, not exact formula · length / format penalties keep it from padding</text>
+</svg>
+<figcaption><b>A blended reward.</b> Final signal ≈ correctness + verifier quality + meta confidence + refinement
+gain − length/format penalties. The refinement term matters most: reward "did the revision actually improve the
+proof," or the model learns <b>empty refinement</b> — longer, not better.</figcaption>
+</figure>
+
+<h3>Why not one model from day one</h3>
+<p>If the generator critiques itself from the start it tends to go lenient on its own mistakes, parrot shallow
+rubric phrases, and sound evaluative without being correct — optimizing for "passing the critic voice" instead
+of real rigor. The separate verifier is an <b>external pressure source</b>. You need it while learning; you can
+often drop it at inference once the rubric is internalized.</p>
+
+<h3>Where the verifier stack goes wrong — and the guardrails</h3>
+<table class="cmp">
+<thead><tr><th>Failure mode</th><th>Guard against it with</th></tr></thead>
+<tbody>
+<tr><td>Verifier too harsh / too forgiving</td><td>a strong human-labeled calibration set; check calibration, not just accuracy</td></tr>
+<tr><td>Confuses style with correctness</td><td>deliberately polished-but-wrong and correct-but-awkward proofs in the test set</td></tr>
+<tr><td>Rewards rubric mimicry</td><td>pairwise comparisons, not only scalar labels</td></tr>
+<tr><td>Meta-verifier just learns to agree</td><td>adversarial audits; separate train/test families</td></tr>
+<tr><td>Generator games the verifier's language</td><td>held-out counterexamples; recalibrate as the generator improves</td></tr>
+</tbody>
+</table>
+<p>This is the same discipline as reward-model and adversarial-evaluation work: the danger is the evaluation
+stack becoming <b>self-reinforcing nonsense</b>, so you test it, don't just trust it.</p>
+
+<h2>Part 2 · How the sparse-attention indexer gets good</h2>
+<p>The indexer scores past tokens for the current token and hands a small subset to real attention — a
+retrieval / routing system living <b>inside</b> the transformer. The hard part: there is no label saying "for
+token 8127, these exact 17 old tokens are the right ones."</p>
+
+<h3>It learns indirectly, end to end</h3>
+<figure>
+<svg viewBox="0 0 760 200" role="img" aria-label="End-to-end training of the indexer through downstream loss">
+  <rect class="bx"  x="20"  y="46" width="120" height="46" rx="8"/><text class="tc" x="80"  y="74">tokens</text>
+  <path class="ln" d="M140 69 H168"/>
+  <rect class="bxa" x="170" y="40" width="150" height="58" rx="10"/><text class="tc" x="245" y="64">indexer</text><text class="sc" x="245" y="82">picks a subset</text>
+  <path class="ln" d="M320 69 H348"/>
+  <rect class="bx"  x="350" y="40" width="170" height="58" rx="10"/><text class="tc" x="435" y="64">attention</text><text class="sc" x="435" y="82">over the subset only</text>
+  <path class="ln" d="M520 69 H548"/>
+  <rect class="bxd" x="550" y="46" width="180" height="46" rx="8"/><text class="w" x="640" y="74">task loss</text>
+  <path class="lnq" d="M640 92 C640 150 245 150 245 100"/>
+  <text class="sc" x="410" y="176">gradient flows back — the only signal is: did the chosen context help or hurt?</text>
+</svg>
+<figcaption><b>Weak but workable supervision.</b> No one tells the indexer which tokens were right. It only learns
+because better picks lower the final loss. That makes the picker <b>high-leverage, weakly supervised, and easy
+to destabilize</b> — the core difficulty of all sparse routing.</figcaption>
+</figure>
+
+<h3>The tricks that make it trainable</h3>
+<figure>
+<svg viewBox="0 0 760 250" role="img" aria-label="Four techniques to train a sparse indexer">
+  <rect class="bxa" x="16" y="16" width="356" height="100" rx="12"/>
+  <text class="a" x="34" y="42">1 · Distill from a dense teacher</text>
+  <text class="s" x="34" y="66">full attention = an oracle of relevance;</text>
+  <text class="s" x="34" y="86">compress that oracle into a sparse policy.</text>
+  <rect class="bx" x="388" y="16" width="356" height="100" rx="12"/>
+  <text class="a" x="406" y="42">2 · Warm start, then sparsify</text>
+  <text class="s" x="406" y="66">train dense first, introduce sparsity</text>
+  <text class="s" x="406" y="86">gradually — abrupt sparsity hurts learning.</text>
+  <rect class="bx" x="16" y="130" width="356" height="100" rx="12"/>
+  <text class="a" x="34" y="156">3 · Keep a guaranteed fallback</text>
+  <text class="s" x="34" y="180">always attend to a local window + a few</text>
+  <text class="s" x="34" y="200">global anchors, so the picker isn't alone.</text>
+  <rect class="bx" x="388" y="130" width="356" height="100" rx="12"/>
+  <text class="a" x="406" y="156">4 · Auxiliary losses</text>
+  <text class="s" x="406" y="180">match dense attention mass; predict</text>
+  <text class="s" x="406" y="200">"will this token matter later?"</text>
+</svg>
+<figcaption><b>Don't ask the picker to learn from scratch, alone, all at once.</b> These four are the standard
+ways to de-risk it — a dense teacher to imitate, a gentle sparsity schedule, a safety net of guaranteed
+context, and side-signals that give the picker something to aim at beyond the far-off task loss.</figcaption>
+</figure>
+
+<figure>
+<svg viewBox="0 0 760 130" role="img" aria-label="Fallback context composition">
+  <rect x="20"  y="40" width="320" height="48" rx="8" class="bxg"/><text class="tc" x="180" y="68">local window (recent)</text>
+  <rect x="344" y="40" width="150" height="48" rx="8" class="bx"/><text class="tc" x="419" y="63">global</text><text class="sc" x="419" y="80">anchors</text>
+  <rect x="498" y="40" width="248" height="48" rx="8" class="bxa"/><text class="tc" x="622" y="68">learned sparse picks</text>
+  <text class="sc" x="380" y="112">the attention budget = a safe base + the risky, high-value learned part</text>
+</svg>
+<figcaption><b>Never pure learned picks.</b> A robust design spends most of its budget on a safe base (a local
+window plus a few global anchors) and lets the learned selector add the high-value, long-range hits on top.</figcaption>
+</figure>
+
+<h3>The best outside analogies</h3>
+<table class="cmp">
+<thead><tr><th>Field</th><th>The indexer is like…</th><th>The lesson it lends</th></tr></thead>
+<tbody>
+<tr><td>Information retrieval</td><td>a first-stage retriever; attention is the expensive reranker</td><td>high recall at stage 1 is what matters; measure recall separately from final answer quality; hybrid beats pure-learned</td></tr>
+<tr><td>Mixture-of-experts</td><td>a router deciding which memory gets compute</td><td>routers collapse; load-balancing and auxiliary regularization help; end-to-end alone can be unstable</td></tr>
+<tr><td>Pruning / adaptive compute</td><td>a learned compute-allocation policy</td><td>introduce sparsity gradually; soft-to-hard schedules; keep a fallback path early</td></tr>
+<tr><td>RL / bandits</td><td>a policy choosing where to spend limited compute</td><td>exploration matters; greedy local choices trap it; sparse, delayed credit is noisy</td></tr>
+</tbody>
+</table>
+
+<h3>How you know an indexer is actually good</h3>
+<p>Not "the model still performs okay." A good indexer is efficient <i>and</i>: end-task quality stays close to
+the dense baseline, long-range retrieval stays reliable, selections are stable rather than chaotic, and it
+degrades <b>gracefully</b> as sparsity tightens instead of failing catastrophically on rare-but-crucial context.</p>
+
+<div class="callout"><strong>The three things I'd worry about most.</strong>
+(1) <b>False negatives</b> — an important old token never gets selected.
+(2) <b>Selector collapse</b> — it always picks local or superficial cues.
+(3) <b>Metric blindness</b> — the average benchmark looks fine while hard long-context cases fail badly.
+The defense is dedicated stress tests: needle-in-a-haystack, true long-range dependencies, and adversarial
+distractors — not just average accuracy.</div>
+
+<h2>Clean summary</h2>
+<div class="plain">
+<b>Verifier stack:</b> generator solves → verifier scores and critiques → meta-verifier audits the verifier →
+the generator is trained under that stronger feedback → later one model can internalize the rubric and
+self-refine alone.
+<br><br>
+<b>Indexer:</b> trained mostly end-to-end from downstream loss → improved with dense-to-sparse distillation,
+guaranteed fallback context, staged sparsification, and auxiliary signals → best outside analogies are
+retrieval, MoE routing, pruning, and bandit-style compute allocation.
+</div>
+
+<p style="margin-top:28px">Back to <a href="deepseek-illustrated.html">the illustrated overview</a>, or on to
+<a href="06-verifier-and-bluffing.html">the lab's own verifier experiment</a>, which tests exactly the
+"catch the bluff" behavior this page describes.</p>
+
+</article></main>
+</div>
+</body>
+</html>

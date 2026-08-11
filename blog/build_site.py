@@ -40,6 +40,7 @@ PAGES: list[tuple[str, str]] = [
 # and linked in the nav. These are not markdown — they carry their own styling.
 EXTRA_HTML: list[tuple[str, str]] = [
     ("deepseek-illustrated.html", "DeepSeek V3 → V3.2 · illustrated"),
+    ("deepseek-deeper.html", "DeepSeek deeper · training internals"),
 ]
 
 _LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
