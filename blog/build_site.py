@@ -36,6 +36,12 @@ PAGES: list[tuple[str, str]] = [
     ("08-putting-it-together.md", "8. Putting it together"),
 ]
 
+# Hand-authored rich HTML pages (with inline SVG) copied verbatim into the site
+# and linked in the nav. These are not markdown — they carry their own styling.
+EXTRA_HTML: list[tuple[str, str]] = [
+    ("deepseek-illustrated.html", "DeepSeek V3 → V3.2 · illustrated"),
+]
+
 _LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 _BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")
 _CODE_RE = re.compile(r"`([^`]+)`")
@@ -228,12 +234,24 @@ li {{ margin:5px 0; }}
 """
 
 
+def _navlinks(active: str) -> str:
+    """Nav order: Home, the illustrated extra pages, then the numbered series."""
+    links = [f'<a href="index.html" class="{"active" if active == "README.md" else ""}">Home</a>']
+    for name, title in EXTRA_HTML:
+        links.append(f'<a href="{name}" class="{"active" if active == name else ""}">{title}</a>')
+    for md, title in PAGES[1:]:
+        links.append(f'<a href="{out_name(md)}" class="{"active" if md == active else ""}">{title}</a>')
+    return "\n".join(links)
+
+
 def build() -> None:
     SITE_DIR.mkdir(exist_ok=True)
-    navlinks_for = lambda active: "\n".join(
-        f'<a href="{out_name(md)}" class="{"active" if md == active else ""}">{title}</a>'
-        for md, title in PAGES
-    )
+    # Copy hand-authored rich HTML pages verbatim.
+    for name, _ in EXTRA_HTML:
+        src = BLOG_DIR / name
+        if src.exists():
+            (SITE_DIR / name).write_text(src.read_text())
+    navlinks_for = _navlinks
     for idx, (md, title) in enumerate(PAGES):
         src = BLOG_DIR / md
         if not src.exists():

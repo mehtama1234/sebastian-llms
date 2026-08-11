@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeepSeek V3 → V3.2, illustrated</title>
+<style>
+:root { --ink:#1f2328; --muted:#59636e; --line:#d8dee4; --accent:#8a5a2b; --bg:#fbf9f6; --card:#fff; --code:#f3efe9; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
+.wrap { display:flex; max-width:1180px; margin:0 auto; }
+nav { width:250px; flex:none; padding:32px 18px; border-right:1px solid var(--line);
+  position:sticky; top:0; align-self:flex-start; height:100vh; overflow:auto; }
+nav h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 14px; }
+nav a { display:block; padding:6px 10px; margin:2px 0; border-radius:7px; color:var(--ink); text-decoration:none; font-size:14px; }
+nav a:hover { background:var(--code); }
+nav a.active { background:var(--accent); color:#fff; }
+nav .sec { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:16px 0 4px 10px; }
+main { flex:1; min-width:0; padding:40px 52px 90px; }
+article { max-width:780px; }
+h1 { font-size:32px; line-height:1.2; margin:0 0 8px; }
+.lede { color:var(--muted); font-size:17px; margin:0 0 28px; }
+h2 { font-size:23px; margin:44px 0 12px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+h3 { font-size:17px; margin:28px 0 8px; }
+p { margin:13px 0; }
+a { color:var(--accent); }
+ul,ol { padding-left:22px; }
+li { margin:5px 0; }
+code { background:var(--code); padding:2px 6px; border-radius:5px; font-size:14px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+.callout { background:#faf3ea; border-left:4px solid var(--accent); padding:12px 16px 12px 18px;
+  border-radius:0 8px 8px 0; margin:20px 0; }
+.callout strong { color:var(--accent); }
+.plain { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 18px; margin:16px 0; }
+.plain b { color:var(--accent); }
+figure { margin:26px 0; padding:20px 20px 8px; background:var(--card); border:1px solid var(--line); border-radius:14px;
+  box-shadow:0 1px 2px rgba(0,0,0,.03); }
+figure svg { width:100%; height:auto; display:block; }
+figcaption { margin:14px 4px 8px; font-size:14px; color:var(--muted); }
+figcaption b { color:var(--ink); }
+/* svg vocabulary */
+.bx { fill:#fff; stroke:#c9cdd2; stroke-width:1.5; }
+.bxa { fill:#faf3ea; stroke:var(--accent); stroke-width:1.5; }
+.bxd { fill:#2b2620; stroke:#2b2620; }
+.bxg { fill:#f3efe9; stroke:#c9cdd2; stroke-width:1.5; }
+text.t { fill:#1f2328; font:600 13px -apple-system,system-ui,sans-serif; }
+text.tc{ fill:#1f2328; font:600 13px -apple-system,system-ui,sans-serif; text-anchor:middle; }
+text.s { fill:#59636e; font:11.5px ui-monospace,monospace; }
+text.sc{ fill:#59636e; font:11.5px ui-monospace,monospace; text-anchor:middle; }
+text.w { fill:#f5efe6; font:600 13px system-ui,sans-serif; text-anchor:middle; }
+text.a { fill:#8a5a2b; font:600 12px ui-monospace,monospace; }
+text.ac{ fill:#8a5a2b; font:600 12px ui-monospace,monospace; text-anchor:middle; }
+.ln { stroke:#8a5a2b; stroke-width:2; fill:none; marker-end:url(#ar); }
+.lnq{ stroke:#b9bdc2; stroke-width:1.5; fill:none; stroke-dasharray:4 3; }
+.dot{ fill:#c9cdd2; } .dotA{ fill:#8a5a2b; } .dotN{ fill:#2b2620; }
+@media (max-width:860px){ .wrap{flex-direction:column;} nav{width:auto;height:auto;position:static;
+  border-right:none;border-bottom:1px solid var(--line);} main{padding:26px 20px 60px;} }
+</style>
+</head>
+<body>
+<!-- shared arrowhead -->
+<svg width="0" height="0" style="position:absolute"><defs>
+<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0 0L10 5L0 10z" fill="#8a5a2b"/></marker></defs></svg>
+
+<div class="wrap">
+<nav>
+<h2>2026 LLM lab</h2>
+<a href="index.html">Home</a>
+<a href="deepseek-illustrated.html" class="active">DeepSeek V3 → V3.2 · illustrated</a>
+<div class="sec">The lab series</div>
+<a href="01-why-this-lab-exists.html">1. Why this lab exists</a>
+<a href="02-how-the-benchmark-works.html">2. How the benchmark works</a>
+<a href="03-retrieval-grep-vs-vector.html">3. Retrieval</a>
+<a href="04-context-delivery.html">4. Context delivery</a>
+<a href="05-repo-instructions.html">5. Repo instructions</a>
+<a href="06-verifier-and-bluffing.html">6. The verifier</a>
+<a href="07-test-time-scaling.html">7. Test-time scaling</a>
+<a href="08-putting-it-together.html">8. Putting it together</a>
+</nav>
+
+<main><article>
+<h1>DeepSeek V3 → V3.2, illustrated</h1>
+<p class="lede">A picture-first walk through Sebastian Raschka's technical review of DeepSeek's
+model line — what changed in the architecture, what changed in the training, and why it matters.</p>
+
+<div class="callout">
+<strong>What this is.</strong> This is not a DeepSeek paper itself. It is Sebastian Raschka's technical
+review of DeepSeek's model line from V3 to V3.2, plus the side releases around it. The article answers
+three questions: (1) what changed architecturally? (2) what changed in reasoning / RL training?
+(3) why do those changes matter?
+</div>
+
+<p>The article's core claim is simple:</p>
+<ul>
+<li>DeepSeek <b>V3</b> established the base architecture.</li>
+<li><b>R1</b> showed how far strong reasoning post-training could go on top of that base.</li>
+<li><b>V3.1, V3.2-Exp, DeepSeekMath V2, and V3.2</b> show DeepSeek kept improving on two fronts at once:
+inference efficiency / attention design, and reasoning / RL / self-verification training.</li>
+</ul>
+<p>So the PDF is really about <b>evolution</b>, not one isolated model.</p>
+
+<h2>The big picture</h2>
+<p>The article is built around three layers.</p>
+
+<figure>
+<svg viewBox="0 0 760 210" role="img" aria-label="Three layers: genealogy, architecture, training">
+  <g>
+    <rect class="bxa" x="8" y="12" width="744" height="56" rx="10"/>
+    <circle cx="40" cy="40" r="14" class="bxd"/><text class="w" x="40" y="44">1</text>
+    <text class="t" x="70" y="36">Model genealogy</text>
+    <text class="s" x="70" y="54">V3 → R1 → R1-0528 → V3.1 → V3.2-Exp → DeepSeekMath V2 → V3.2</text>
+  </g>
+  <g>
+    <rect class="bx" x="8" y="78" width="744" height="56" rx="10"/>
+    <circle cx="40" cy="106" r="14" class="bxd"/><text class="w" x="40" y="110">2</text>
+    <text class="t" x="70" y="102">Architecture changes</text>
+    <text class="s" x="70" y="120">keep MLA (compressed memory) · add DSA (learned sparse attention)</text>
+  </g>
+  <g>
+    <rect class="bx" x="8" y="144" width="744" height="56" rx="10"/>
+    <circle cx="40" cy="172" r="14" class="bxd"/><text class="w" x="40" y="176">3</text>
+    <text class="t" x="70" y="168">Training changes</text>
+    <text class="s" x="70" y="186">keep RLVR / GRPO · widen verifier + reward design · build in hybrid reasoning</text>
+  </g>
+</svg>
+<figcaption><b>The spine of the article.</b> Everything hangs off these three layers: who came from whom,
+what changed in the wiring, and what changed in how the model was taught.</figcaption>
+</figure>
+
+<figure>
+<svg viewBox="0 0 760 210" role="img" aria-label="DeepSeek model genealogy timeline">
+  <!-- main line -->
+  <g font-family="monospace">
+    <rect class="bxa" x="10"  y="46" width="104" height="44" rx="8"/>
+    <text class="tc" x="62"  y="66">V3</text><text class="sc" x="62"  y="82">base</text>
+    <rect class="bx"  x="132" y="46" width="104" height="44" rx="8"/>
+    <text class="tc" x="184" y="66">R1</text><text class="sc" x="184" y="82">reasoning</text>
+    <rect class="bx"  x="254" y="46" width="104" height="44" rx="8"/>
+    <text class="tc" x="306" y="66">R1-0528</text><text class="sc" x="306" y="82">post-train ↑</text>
+    <rect class="bx"  x="376" y="46" width="104" height="44" rx="8"/>
+    <text class="tc" x="428" y="66">V3.1</text><text class="sc" x="428" y="82">hybrid</text>
+    <rect class="bx"  x="498" y="46" width="104" height="44" rx="8"/>
+    <text class="tc" x="550" y="66">V3.2-Exp</text><text class="sc" x="550" y="82">+ DSA (exp)</text>
+    <rect class="bxa" x="620" y="46" width="128" height="44" rx="8"/>
+    <text class="tc" x="684" y="66">V3.2</text><text class="sc" x="684" y="82">flagship</text>
+  </g>
+  <!-- arrows between -->
+  <path class="ln" d="M114 68 H130"/>
+  <path class="ln" d="M236 68 H252"/>
+  <path class="ln" d="M358 68 H374"/>
+  <path class="ln" d="M480 68 H496"/>
+  <path class="ln" d="M602 68 H618"/>
+  <!-- side branch -->
+  <rect class="bxg" x="470" y="150" width="180" height="42" rx="8"/>
+  <text class="tc" x="560" y="170">DeepSeekMath V2</text>
+  <text class="sc" x="560" y="186">self-verify proof-of-concept</text>
+  <path class="ln" d="M600 150 C620 128 660 112 684 92"/>
+  <text class="a" x="14" y="24">main line</text>
+  <text class="s" x="470" y="140">side release that feeds V3.2 ↴</text>
+</svg>
+<figcaption><b>Model genealogy.</b> One base architecture (V3) upgraded step by step. R1 was the reasoning
+research spike; V3.1 turned the line into a hybrid; V3.2-Exp shipped the new attention so the serving
+stack could get ready; DeepSeekMath V2 proved out self-verification before it landed in V3.2.</figcaption>
+</figure>
+
+<h2>1. Hybrid reasoning vs dedicated reasoning</h2>
+<p>One of the first things Raschka emphasizes is that DeepSeek changed <b>product shape</b>, not just internals.</p>
+
+<figure>
+<svg viewBox="0 0 760 200" role="img" aria-label="Two separate models versus one hybrid model">
+  <text class="a" x="20" y="26">EARLIER — two separate models</text>
+  <rect class="bx" x="20" y="42" width="150" height="48" rx="8"/>
+  <text class="tc" x="95" y="62">V3</text><text class="sc" x="95" y="80">general chat</text>
+  <rect class="bx" x="20" y="104" width="150" height="48" rx="8"/>
+  <text class="tc" x="95" y="124">R1</text><text class="sc" x="95" y="142">reasoning</text>
+
+  <line x1="330" y1="30" x2="330" y2="170" class="lnq"/>
+
+  <text class="a" x="380" y="26">LATER — one model, two modes</text>
+  <rect class="bxa" x="380" y="60" width="330" height="76" rx="10"/>
+  <text class="tc" x="545" y="86">V3.1 / V3.2 (hybrid)</text>
+  <rect class="bxd" x="404" y="98" width="130" height="26" rx="13"/>
+  <text class="w" x="469" y="115">chat mode</text>
+  <rect class="bx"  x="556" y="98" width="130" height="26" rx="13"/>
+  <text class="tc" x="621" y="115">reason mode</text>
+  <path class="ln" d="M180 90 C260 90 300 98 378 98"/>
+</svg>
+<figcaption><b>From two models to one.</b> Instead of shipping a chat model and a separate reasoning model,
+the newer line supports both inside one model, toggled at prompt time. A dedicated reasoner is easier to
+tune; a hybrid is more practical as a product. Raschka's read: R1 was the research step, V3.2 is the
+"best overall flagship" play.</figcaption>
+</figure>
+
+<h2>2. MLA — the existing efficiency base</h2>
+<p>Before V3.2, DeepSeek already had an efficiency idea: <b>Multi-Head Latent Attention (MLA)</b>. Instead of
+storing huge full key/value states for every token, DeepSeek compresses them into a latent form for the
+KV cache, then reconstructs what's needed later.</p>
+
+<figure>
+<svg viewBox="0 0 760 220" role="img" aria-label="Normal KV cache versus MLA compressed cache">
+  <text class="a" x="20" y="24">NORMAL — store full-size notes</text>
+  <g>
+    <rect class="bx" x="20" y="40"  width="150" height="26"/><text class="s" x="30" y="57">key ██████</text>
+    <rect class="bx" x="176" y="40" width="120" height="26"/><text class="s" x="186" y="57">val ████</text>
+    <rect class="bx" x="20" y="74"  width="150" height="26"/><text class="s" x="30" y="91">key ██████</text>
+    <rect class="bx" x="176" y="74" width="120" height="26"/><text class="s" x="186" y="91">val ████</text>
+    <rect class="bx" x="20" y="108" width="150" height="26"/><text class="s" x="30" y="125">key ██████</text>
+    <rect class="bx" x="176" y="108" width="120" height="26"/><text class="s" x="186" y="125">val ████</text>
+  </g>
+  <text class="s" x="20" y="152" fill="#b4443a">memory grows fast ↓ long context = expensive</text>
+
+  <line x1="360" y1="20" x2="360" y2="200" class="lnq"/>
+
+  <text class="a" x="392" y="24">MLA — squash, then file</text>
+  <g>
+    <rect class="bxg" x="392" y="40"  width="110" height="26"/><text class="s" x="400" y="57">token 1</text>
+    <path class="ln" d="M506 53 H556"/>
+    <rect class="bxa" x="560" y="40"  width="70" height="26"/><text class="s" x="572" y="57">[k][v]</text>
+    <rect class="bxg" x="392" y="74"  width="110" height="26"/><text class="s" x="400" y="91">token 2</text>
+    <path class="ln" d="M506 87 H556"/>
+    <rect class="bxa" x="560" y="74"  width="70" height="26"/><text class="s" x="572" y="91">[k][v]</text>
+    <rect class="bxg" x="392" y="108" width="110" height="26"/><text class="s" x="400" y="125">token 3</text>
+    <path class="ln" d="M506 121 H556"/>
+    <rect class="bxa" x="560" y="108" width="70" height="26"/><text class="s" x="572" y="125">[k][v]</text>
+  </g>
+  <text class="s" x="392" y="152">small footprint · puff back up only when reading</text>
+  <text class="ac" x="392" y="186">think: vacuum-bag the clothes before they go in the suitcase</text>
+</svg>
+<figcaption><b>MLA stores a compressed memory of the past.</b> It adds one extra matrix multiply to
+reconstruct, but slashes KV-cache memory — the real bottleneck for long-context inference. DSA later
+sits <b>on top of</b> this compressed memory, so it isn't starting from an empty foundation.</figcaption>
+</figure>
+
+<h2>3. The main architecture change — DSA</h2>
+<p>This is the most important architecture section in the article. V3.2-Exp and V3.2 use
+<b>DeepSeek Sparse Attention (DSA)</b>. The baseline comparison: normal attention lets a token look at
+<b>all</b> earlier tokens; sliding-window lets it look at a <b>recent fixed</b> window; DSA lets it look at
+a <b>selected subset</b> — and the subset is not fixed, it is <b>learned</b>.</p>
+
+<figure>
+<svg viewBox="0 0 760 250" role="img" aria-label="Full, sliding-window, and DSA attention compared">
+  <!-- FULL -->
+  <text class="a" x="20" y="26">FULL — look back at everyone</text>
+  <text class="s" x="560" y="26">accurate · expensive</text>
+  <circle cx="700" cy="52" r="8" class="dotN"/>
+  <g>
+    <circle cx="40" cy="52" r="7" class="dot"/><circle cx="110" cy="52" r="7" class="dot"/>
+    <circle cx="180" cy="52" r="7" class="dot"/><circle cx="250" cy="52" r="7" class="dot"/>
+    <circle cx="320" cy="52" r="7" class="dot"/><circle cx="390" cy="52" r="7" class="dot"/>
+    <circle cx="460" cy="52" r="7" class="dot"/><circle cx="530" cy="52" r="7" class="dot"/>
+  </g>
+  <path class="lnq" d="M694 52 H48"/>
+
+  <!-- SLIDING -->
+  <text class="a" x="20" y="112">SLIDING WINDOW — only the last few</text>
+  <text class="s" x="520" y="112">cheap · forgets the far past</text>
+  <circle cx="700" cy="138" r="8" class="dotN"/>
+  <g>
+    <circle cx="40" cy="138" r="7" class="dot" opacity="0.35"/><circle cx="110" cy="138" r="7" class="dot" opacity="0.35"/>
+    <circle cx="180" cy="138" r="7" class="dot" opacity="0.35"/><circle cx="250" cy="138" r="7" class="dot" opacity="0.35"/>
+    <circle cx="460" cy="138" r="7" class="dotA"/><circle cx="530" cy="138" r="7" class="dotA"/>
+    <circle cx="600" cy="138" r="7" class="dotA"/>
+  </g>
+  <path class="ln" d="M694 138 H610"/>
+  <text class="s" x="150" y="160">(older tokens ignored)</text>
+
+  <!-- DSA -->
+  <text class="a" x="20" y="200">DSA — a learned handful, near OR far</text>
+  <text class="s" x="540" y="200">cheap AND keeps what matters</text>
+  <circle cx="700" cy="226" r="8" class="dotN"/>
+  <g>
+    <circle cx="40" cy="226" r="7" class="dot" opacity="0.35"/>
+    <circle cx="110" cy="226" r="7" class="dotA"/>
+    <circle cx="180" cy="226" r="7" class="dot" opacity="0.35"/>
+    <circle cx="320" cy="226" r="7" class="dotA"/>
+    <circle cx="390" cy="226" r="7" class="dot" opacity="0.35"/>
+    <circle cx="530" cy="226" r="7" class="dotA"/>
+    <circle cx="600" cy="226" r="7" class="dotA"/>
+  </g>
+  <path class="ln" d="M694 226 C640 226 630 226 606 226"/>
+  <path class="ln" d="M694 226 C500 210 200 210 116 224"/>
+  <path class="ln" d="M694 226 C560 208 360 208 326 222"/>
+</svg>
+<figcaption><b>Not "the last N" — "the N that matter."</b> DSA can reach a token 5,000 words back if it's the
+one that counts, and skip nearby noise. The pattern of which tokens get picked is learned, not fixed.</figcaption>
+</figure>
+
+<h3>How DSA works</h3>
+<p>Raschka describes two pieces: a <b>lightning indexer</b> that scores how relevant each past token is to the
+current query (a scaled dot product passed through ReLU, with per-head learned weights, computed over MLA's
+compressed representations), and a <b>token selector</b> that keeps only the top-scoring tokens (top-k, set to
+2048 in the released code). The current token then attends to just those.</p>
+
+<figure>
+<svg viewBox="0 0 760 250" role="img" aria-label="DSA pipeline: indexer, selector, sparse attention">
+  <rect class="bxd" x="20" y="30" width="120" height="44" rx="8"/><text class="w" x="80" y="57">new token</text>
+  <path class="ln" d="M140 52 H188"/>
+  <rect class="bxa" x="190" y="24" width="180" height="56" rx="10"/>
+  <text class="tc" x="280" y="47">lightning indexer</text>
+  <text class="sc" x="280" y="65">score every past token</text>
+  <path class="ln" d="M370 52 H430"/>
+  <!-- score bars -->
+  <text class="s" x="440" y="20">relevance scores</text>
+  <g>
+    <rect x="440" y="28" width="18" height="52" class="bxg"/><rect x="440" y="56" width="18" height="24" fill="#8a5a2b"/>
+    <rect x="466" y="28" width="18" height="52" class="bxg"/><rect x="466" y="72" width="18" height="8"  fill="#c9cdd2"/>
+    <rect x="492" y="28" width="18" height="52" class="bxg"/><rect x="492" y="48" width="18" height="32" fill="#8a5a2b"/>
+    <rect x="518" y="28" width="18" height="52" class="bxg"/><rect x="518" y="74" width="18" height="6"  fill="#c9cdd2"/>
+    <rect x="544" y="28" width="18" height="52" class="bxg"/><rect x="544" y="40" width="18" height="40" fill="#8a5a2b"/>
+    <rect x="570" y="28" width="18" height="52" class="bxg"/><rect x="570" y="70" width="18" height="10" fill="#c9cdd2"/>
+  </g>
+
+  <path class="ln" d="M514 88 V120 H280 V132"/>
+  <rect class="bxa" x="180" y="134" width="200" height="52" rx="10"/>
+  <text class="tc" x="280" y="156">token selector</text>
+  <text class="sc" x="280" y="174">keep top-k  (k = 2048)</text>
+  <path class="ln" d="M380 160 H440"/>
+  <rect class="bx" x="444" y="138" width="150" height="44" rx="8"/>
+  <text class="tc" x="519" y="158">attend to those</text><text class="sc" x="519" y="174">ignore the rest</text>
+
+  <rect class="bxg" x="180" y="206" width="404" height="34" rx="8"/>
+  <text class="tc" x="382" y="228">cost:  O(L²)  over everyone   →   O(L·k)  over the kept few   (k ≪ L)</text>
+</svg>
+<figcaption><b>The pipeline.</b> Score → keep the top few → attend to only those. Because the indexer scores
+using MLA's already-compressed notes, the picking itself is cheap. The bet: pick a small enough useful
+subset and you keep most of the signal while cutting the quadratic cost to linear.</figcaption>
+</figure>
+
+<div class="callout"><strong>The honest bar.</strong> DSA's goal was <b>not</b> to beat V3.1-Terminus. It was to
+keep the quality drop from sparsity <b>small</b> while getting big efficiency gains. The real success
+criterion is the quality-per-cost tradeoff — which is also why V3.2-Exp shipped first: to get the serving
+infrastructure ready for this non-standard attention.</div>
+
+<h2>4. DeepSeekMath V2 — the important side story</h2>
+<p>Raschka spends real time here, and it's not filler: it's a proof-of-concept for techniques that land in
+V3.2. Its setup has three roles — a <b>proof generator</b>, a <b>proof verifier</b>, and a <b>meta-verifier</b>.</p>
+
+<figure>
+<svg viewBox="0 0 760 300" role="img" aria-label="Generator, verifier, meta-verifier during training; single model at inference">
+  <text class="a" x="20" y="24">WHILE TRAINING — three roles</text>
+  <rect class="bxa" x="20" y="40" width="150" height="56" rx="10"/>
+  <text class="tc" x="95" y="63">GENERATOR</text><text class="sc" x="95" y="82">writes the proof</text>
+  <path class="ln" d="M170 68 H250"/><text class="s" x="176" y="60">proof</text>
+  <rect class="bx" x="252" y="40" width="160" height="56" rx="10"/>
+  <text class="tc" x="332" y="63">VERIFIER</text><text class="sc" x="332" y="82">scores 0 / ½ / 1</text>
+  <path class="ln" d="M412 68 H492"/><text class="s" x="420" y="60">reward</text>
+  <rect class="bxg" x="494" y="40" width="150" height="56" rx="10"/>
+  <text class="tc" x="569" y="63">training signal</text><text class="sc" x="569" y="82">to the generator</text>
+  <!-- reward loops back -->
+  <path class="ln" d="M569 96 V150 H95 V98"/>
+  <text class="s" x="300" y="146">the score teaches the generator</text>
+
+  <!-- meta verifier -->
+  <rect class="bx" x="252" y="180" width="160" height="50" rx="10"/>
+  <text class="tc" x="332" y="202">META-VERIFIER</text><text class="sc" x="332" y="220">is the grader grading fairly?</text>
+  <path class="ln" d="M332 180 V98"/>
+  <text class="ac" x="420" y="205">grading quality 0.85 → 0.96</text>
+
+  <line x1="20" y1="252" x2="740" y2="252" class="lnq"/>
+  <text class="a" x="20" y="276">AT INFERENCE — collapse to one</text>
+  <rect class="bxa" x="360" y="258" width="360" height="34" rx="10"/>
+  <text class="tc" x="540" y="280">GENERATOR = VERIFIER  ·  one model writes AND checks itself</text>
+</svg>
+<figcaption><b>A grader, and a grader for the grader.</b> The rubric verifier gives graded judgment
+(1 = rigorous, ½ = mostly right, 0 = fatally flawed) instead of plain right/wrong; the meta-verifier keeps
+the grader honest so a noisy judge doesn't corrupt the whole training signal.</figcaption>
+</figure>
+
+<h2>5. Why separate verifier training matters</h2>
+<p>Classic self-refinement uses <b>one</b> model to generate, critique, and revise. The DeepSeek team found a
+weakness: a model prompted to generate and check its own proof in one shot <i>"tends to claim correctness
+even when the external verifier easily identifies flaws."</i> That is bluffing.</p>
+
+<p>The subtle, high-signal claim: the separate verifier is <b>essential during training</b>, but at
+<b>inference you can collapse back to one model</b> — because that model was already shaped by a stronger
+verifier and meta-verifier. It isn't naive self-critique; it's self-critique <i>after being trained under an
+external critic</i>.</p>
+
+<div class="plain">
+<b>Plain version.</b> "Just have the model check its own work" is not the lesson. The lesson is:
+self-checking becomes trustworthy only <b>after</b> the model has been trained with a better checking process
+than it would invent on its own. Same student, but grown up under a strict grader — now it can grade itself.
+</div>
+
+<h3>Self-refinement, and the inference-cost tradeoff</h3>
+<figure>
+<svg viewBox="0 0 760 220" role="img" aria-label="Self-refinement loop and the accuracy versus tokens tradeoff">
+  <rect class="bxa" x="30" y="60" width="130" height="50" rx="10"/><text class="tc" x="95" y="82">draft</text><text class="sc" x="95" y="100">write answer</text>
+  <path class="ln" d="M160 85 H210"/>
+  <rect class="bx" x="212" y="60" width="140" height="50" rx="10"/><text class="tc" x="282" y="82">critique</text><text class="sc" x="282" y="100">find the flaws</text>
+  <path class="ln" d="M352 85 H402"/>
+  <rect class="bx" x="404" y="60" width="130" height="50" rx="10"/><text class="tc" x="469" y="82">revise</text><text class="sc" x="469" y="100">fix them</text>
+  <path class="ln" d="M469 110 V150 H95 V112"/>
+  <text class="s" x="210" y="146">loop — up to 8 times, accuracy still climbing</text>
+
+  <!-- mini chart -->
+  <line x1="600" y1="150" x2="600" y2="40" class="lnq"/>
+  <line x1="600" y1="150" x2="730" y2="150" class="lnq"/>
+  <text class="s" x="592" y="34" text-anchor="end">accuracy</text>
+  <text class="s" x="730" y="168" text-anchor="end">tokens →</text>
+  <path d="M600 138 C640 110 680 78 726 60" fill="none" stroke="#8a5a2b" stroke-width="2.5"/>
+  <circle cx="726" cy="60" r="3.5" class="dotA"/>
+</svg>
+<figcaption><b>Better answers cost more tokens.</b> More refinement iterations raise accuracy but raise cost —
+the classic inference-scaling trade. DeepSeek ran up to 8 iterations and accuracy hadn't saturated.</figcaption>
+</figure>
+
+<h2>6. The RL story — from R1 to V3.2</h2>
+<p>The continuity: still in the RLVR family, still using GRPO-style ideas. The change: reward design got wider
+and more task-specific. R1 used a format reward, a language-consistency reward, and a main verifier reward for
+math/code. V3.2 changed this.</p>
+
+<figure>
+<svg viewBox="0 0 760 220" role="img" aria-label="Reward routing by task type">
+  <rect class="bxd" x="300" y="20" width="160" height="40" rx="8"/><text class="w" x="380" y="45">a task</text>
+  <path class="ln" d="M380 60 V86"/>
+  <path class="ln" d="M380 86 H180 V116"/>
+  <path class="ln" d="M380 86 H580 V116"/>
+  <text class="ac" x="380" y="104" text-anchor="middle">is there a hard checker?</text>
+
+  <rect class="bxa" x="60" y="118" width="240" height="80" rx="10"/>
+  <text class="tc" x="180" y="142">YES → symbolic reward</text>
+  <text class="sc" x="180" y="162">math: calculator / proof</text>
+  <text class="sc" x="180" y="180">code: run it, does it pass?</text>
+
+  <rect class="bx" x="460" y="118" width="240" height="80" rx="10"/>
+  <text class="tc" x="580" y="142">NO → generative reward model</text>
+  <text class="sc" x="580" y="162">an LLM judge scores it</text>
+  <text class="sc" x="580" y="180">using a per-prompt rubric</text>
+</svg>
+<figcaption><b>Use a hard checker where you can, a trained judge where you can't.</b> For reasoning and agent
+tasks: rule-based outcome reward, a length penalty, and language consistency. For general tasks with no
+symbolic checker: a generative reward model with prompt-specific rubrics. The pipeline is no longer purely
+verifier-based — it's a hybrid.</figcaption>
+</figure>
+
+<h3>GRPO updates — conservative on purpose</h3>
+<p>The article compares DeepSeek's choices to newer variants like DAPO and Dr. GRPO, and the framing is that
+DeepSeek is relatively <b>conservative</b>: it keeps a KL term (tuned per domain, near zero for math rather
+than removed), keeps the original normalization, and adds targeted fixes — unbiased KL estimate, off-policy
+sequence masking, keeping the MoE routing and sampling mask from the rollout. The point isn't a GRPO
+revolution; it's that DeepSeek cares a lot about <b>stable training behavior</b> over novelty.</p>
+
+<h2>7 & 8. V3.2 proper, and V3.2-Speciale</h2>
+<p>When Raschka reaches V3.2, the message is: this is where the puzzle pieces come together — the strong base
+architecture, MLA, DSA, hybrid reasoning, stronger RL training, and the verifier / self-refinement lessons.
+And it's not just a math model: it's aimed at tools, code, and agentic tasks too. See it as a flagship
+general-purpose open-weight model with serious reasoning, not only a reasoner and not only an efficiency play.</p>
+<p><b>V3.2-Speciale</b> is the extended-thinking variant — trained on reasoning data with a reduced length
+penalty so it writes longer. Same old tradeoff: longer reasoning tends to raise accuracy, at more tokens.
+Strong reasoning comes not only from bigger models but from inference-time compute choices and structured
+refinement.</p>
+
+<h2>9. The appendix-like mHC mention</h2>
+<p>At the end there's a mention of <b>mHC</b> (manifold-constrained hyper-connections). This is side material,
+not the spine. The rough theme: widen the residual "pipe" into several interacting streams, with a
+norm-preserving / stability-oriented constraint on how they mix.</p>
+
+<figure>
+<svg viewBox="0 0 760 190" role="img" aria-label="Single residual stream versus widened mixing streams">
+  <text class="a" x="20" y="26">normal residual — one pipe</text>
+  <line x1="30" y1="110" x2="300" y2="110" stroke="#c9cdd2" stroke-width="6"/>
+  <circle cx="110" cy="110" r="6" class="dotN"/><circle cx="210" cy="110" r="6" class="dotN"/>
+  <text class="s" x="30" y="140">information flows straight through</text>
+
+  <line x1="360" y1="20" x2="360" y2="170" class="lnq"/>
+
+  <text class="a" x="392" y="26">mHC — several pipes that mix</text>
+  <line x1="410" y1="70"  x2="720" y2="70"  stroke="#8a5a2b" stroke-width="4"/>
+  <line x1="410" y1="110" x2="720" y2="110" stroke="#8a5a2b" stroke-width="4"/>
+  <line x1="410" y1="150" x2="720" y2="150" stroke="#8a5a2b" stroke-width="4"/>
+  <path class="lnq" d="M500 70 L560 110"/><path class="lnq" d="M560 110 L620 70"/>
+  <path class="lnq" d="M560 110 L620 150"/><path class="lnq" d="M500 150 L560 110"/>
+  <text class="s" x="392" y="176">kept on a norm-preserving track → steadier training</text>
+</svg>
+<figcaption><b>A wider residual highway.</b> More lanes that can share information, with guardrails so the
+mixing stays stable. Small overhead, better training stability and convergence. Useful to know — but if you're
+prioritizing what matters in the PDF, mHC is not first.</figcaption>
+</figure>
+
+<h2>What I think the most important ideas are</h2>
+<ol>
+<li><b>DSA is the main architecture story</b> — learned sparse attention on top of MLA; efficiency is the
+reason; the success criterion is quality preserved per unit cost.</li>
+<li><b>Verifier training is one of the most interesting training ideas</b> — generator + verifier +
+meta-verifier; external verification strength used during training; later collapse to a single model at
+inference.</li>
+<li><b>DeepSeek is shifting from separate-reasoning-model logic toward hybrid flagship logic</b> — more
+product-integrated, more generally usable.</li>
+<li><b>RL reward design is becoming mixed</b> — symbolic where possible, generative where necessary.</li>
+<li><b>The real theme is not "one clever trick"</b> — it is iterative system-building: each release adds one
+more layer of efficiency, reasoning control, or deployment readiness.</li>
+</ol>
+
+<h2>What the PDF is not saying</h2>
+<ul>
+<li>It is not claiming DSA is a universal replacement for all attention.</li>
+<li>It is not claiming self-verification works automatically.</li>
+<li>It is not claiming V3.2 is only a reasoning model.</li>
+<li>It is not mainly a benchmark chest-thumping article.</li>
+<li>It is not centered on one radical, theorem-level idea.</li>
+</ul>
+<p>It is much more: here is how a high-end open-weight line evolved through a sequence of architecture and
+training decisions.</p>
+
+<h2>My honest evaluation</h2>
+<p>The strongest idea in the whole piece is not the sparse attention alone. The most important practical
+insight is probably this:</p>
+<div class="callout"><strong>A separate verifier may be essential during training even if you later do not
+need a separate verifier at inference.</strong> That's a deep systems insight: don't judge self-refinement by
+testing naive same-model critique — a model can become much better at self-critique after being trained under
+stronger external checking.</div>
+<p>The second strongest idea: DSA is a good example of <b>learned sparsity used for inference efficiency</b>,
+not architecture novelty for its own sake. A mature engineering direction.</p>
+
+<h2>The PDF in one paragraph</h2>
+<p>DeepSeek's path from V3 to V3.2 is the story of a base open-weight architecture being progressively upgraded
+in two ways: first, by making attention and inference more efficient through MLA plus learned sparse attention
+(DSA); and second, by making reasoning more reliable through RLVR, hybrid reasoning training, self-verification,
+and verifier-guided refinement. The article's deepest message is that strong modern LLMs are no longer improving
+mainly through one isolated trick — they improve through layered coordination between architecture, reward
+design, verification, and inference-time compute.</p>
+
+<div class="plain" style="margin-top:32px">
+<b>Where this connects to the lab.</b> Two ideas here are already prototyped in this repo. The MLA→DSA
+compressed-attention lineage lives in <code>architecture-advances-2026</code> (the <code>compressed_attention</code>
+and <code>mhc</code> variants), and the generator/verifier "catch the bluff" loop is exactly what the
+verifier in <code>llm-developments-2026</code> tests — see
+<a href="06-verifier-and-bluffing.html">post 6: the verifier</a>.
+</div>
+
+</article></main>
+</div>
+</body>
+</html>

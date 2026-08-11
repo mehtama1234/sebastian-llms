@@ -7,6 +7,10 @@ answers that question by measurement instead of taste.
 
 Read them in order, or jump to the experiment you care about.
 
+**Also here:** [DeepSeek V3 → V3.2, illustrated](deepseek-illustrated.html) — a picture-first walk
+through Raschka's DeepSeek review, with detailed SVG diagrams for MLA, DSA sparse attention, the
+generator/verifier/meta-verifier setup, self-refinement, RL reward routing, and mHC.
+
 1. [Why this lab exists and how it works](01-why-this-lab-exists.md)
 2. [How the benchmark actually works](02-how-the-benchmark-works.md)
 3. [Retrieval: is grep all you need?](03-retrieval-grep-vs-vector.md)
