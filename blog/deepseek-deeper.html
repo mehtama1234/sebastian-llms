@@ -421,6 +421,56 @@ guaranteed fallback context, staged sparsification, and auxiliary signals → be
 retrieval, MoE routing, pruning, and bandit-style compute allocation.
 </div>
 
+<h2>First principles → the papers behind them</h2>
+<p>Every idea on this page traces to real work. Below, each first-principle concept is paired with the paper(s)
+that introduced or best demonstrate it. All links verified.</p>
+
+<div class="callout"><strong>The two direct sources for the PDF.</strong> The sparse-attention indexer
+(lightning indexer + token selector) →
+<a href="https://arxiv.org/abs/2512.02556" target="_blank" rel="noopener">DeepSeek-V3.2: Pushing the Frontier of Open Large Language Models</a> (arXiv 2512.02556).
+The generator → verifier → meta-verifier stack with self-refinement →
+<a href="https://arxiv.org/abs/2511.22570" target="_blank" rel="noopener">DeepSeekMath-V2: Towards Self-Verifiable Mathematical Reasoning</a> (arXiv 2511.22570).</div>
+
+<h3>The verifier idea</h3>
+<ul>
+<li><b>Score the reasoning steps, not just the final answer</b> — a "process reward model." →
+<a href="https://arxiv.org/abs/2305.20050" target="_blank" rel="noopener">Let's Verify Step by Step</a> (2305.20050).</li>
+<li><b>The full self-verifiable stack</b> — generator, rubric verifier, meta-verifier, self-refinement. →
+<a href="https://arxiv.org/abs/2511.22570" target="_blank" rel="noopener">DeepSeekMath-V2</a> (2511.22570).</li>
+<li><b>Scale the verifier's training labels automatically</b> instead of hand-labeling every step. →
+<a href="https://arxiv.org/abs/2406.06592" target="_blank" rel="noopener">Automated Process Supervision (OmegaPRM)</a> (2406.06592).</li>
+<li><b>A verifier that writes its analysis first, then scores</b> — inspectable judgment. →
+<a href="https://arxiv.org/abs/2504.16828" target="_blank" rel="noopener">Process Reward Models That Think (ThinkPRM)</a> (2504.16828).</li>
+<li><b>What actually makes verifiers work or quietly fail</b> — calibration and data. →
+<a href="https://arxiv.org/abs/2501.07301" target="_blank" rel="noopener">The Lessons of Developing Process Reward Models in Mathematical Reasoning</a> (2501.07301).</li>
+<li><b>The naive baseline this improves on</b> — one model generates → critiques → revises. →
+<a href="https://arxiv.org/abs/2303.17651" target="_blank" rel="noopener">Self-Refine</a> (2303.17651) and
+<a href="https://arxiv.org/abs/2303.11366" target="_blank" rel="noopener">Reflexion</a> (2303.11366).</li>
+<li><b>Training with AI critique-and-revise feedback</b> — different domain, same shape. →
+<a href="https://arxiv.org/abs/2212.08073" target="_blank" rel="noopener">Constitutional AI</a> (2212.08073).</li>
+</ul>
+
+<h3>The sparse-attention indexer</h3>
+<ul>
+<li><b>Route attention by learned content relevance</b> instead of reading everything. →
+<a href="https://arxiv.org/abs/2003.05997" target="_blank" rel="noopener">Routing Transformers</a> (2003.05997);
+the DeepSeek instance is <a href="https://arxiv.org/abs/2512.02556" target="_blank" rel="noopener">DeepSeek-V3.2 / DSA</a> (2512.02556).</li>
+<li><b>Keep a guaranteed fallback</b> — a local window plus a few global anchors. →
+<a href="https://arxiv.org/abs/2004.05150" target="_blank" rel="noopener">Longformer</a> (2004.05150).</li>
+<li><b>Replace dense attention with a cheaper approximate lookup</b> (hashing). →
+<a href="https://arxiv.org/abs/2001.04451" target="_blank" rel="noopener">Reformer</a> (2001.04451).</li>
+<li><b>Dynamic token-level sparsification during long-context inference.</b> →
+<a href="https://arxiv.org/abs/2602.03216" target="_blank" rel="noopener">Token Sparse Attention</a> (2602.03216).</li>
+<li><b>Router lessons that transfer from MoE</b> — routers collapse; need load-balancing and auxiliary losses. →
+<a href="https://arxiv.org/abs/2101.03961" target="_blank" rel="noopener">Switch Transformers</a> (2101.03961).</li>
+<li><b>Distill a cheap first-stage selector from a stronger teacher</b> (the retrieval analogy). →
+<a href="https://arxiv.org/abs/2204.13679" target="_blank" rel="noopener">Curriculum Learning for Dense Retrieval Distillation</a> (2204.13679) and
+<a href="https://arxiv.org/abs/2410.01383" target="_blank" rel="noopener">PairDistill</a> (2410.01383).</li>
+<li><b>The caution</b> — end-to-end learned sparse routers are hard to train, because the network co-adapts
+around bad routing. →
+<a href="https://arxiv.org/abs/2603.02227" target="_blank" rel="noopener">Routing Absorption in Sparse Attention</a> (2603.02227).</li>
+</ul>
+
 <p style="margin-top:28px">Back to <a href="deepseek-illustrated.html">the illustrated overview</a>, or on to
 <a href="06-verifier-and-bluffing.html">the lab's own verifier experiment</a>, which tests exactly the
 "catch the bluff" behavior this page describes.</p>
