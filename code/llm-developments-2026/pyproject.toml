@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-developments-2026"
+version = "0.1.0"
+description = "Production-scale experiment harness for retrieval, context assembly, verifier loops, and test-time scaling from LLMDevelopments.pdf"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=1.24.0",
+]
+
+[project.scripts]
+llm-dev-experiment = "llm_dev_2026.cli:main"
+llm-dev-scorecard = "llm_dev_2026.scorecard_cli:main"
+llm-dev-memo = "llm_dev_2026.memo_cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

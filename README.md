@@ -94,6 +94,9 @@ As of Sunday, August 9, 2026, the current local test suite for `coding-agent-v1`
 - `docs/agent-evals/`: canonical writeups for tool use, multi-step traces, runtime checks, and complex-agent evaluation
 - `docs/architecture-advances-2026/`: canonical writeups for long-context architecture efficiency ideas from `LLMArchitectureAdvances2026.pdf`
 - `docs/qwen3-from-scratch/`: canonical writeups for the Qwen3 implementation track
+- `projects/llm-developments-2026/`: project briefs for production experiments derived from `LLMDevelopments.pdf`
+- `evals/llm-developments-2026/`: benchmark plans for retrieval, context pressure, verifier loops, and long-horizon CLI tasks
+- `code/llm-developments-2026/`: the runnable experiment harness for those plans — retrieval/context/instruction/verifier/test-time-scaling sweeps, scorecards, and an auto-generated adoption memo (37 tests)
 - `evals/agent-evals/`: benchmark plans, rubrics, dataset notes, and scenario-pack shape for the agent-evaluation track
 - `code/qwen3-parity/`: implementation workspace for the reference-vs-scratch Qwen3 project
 
@@ -112,6 +115,7 @@ Secondary documents:
 
 - `LLMEvalApproaches.pdf`
 - `InferenceTimeScaling.pdf`
+- `LLMDevelopments.pdf`
 - `LLmReasoning.pdf`
 - `LLmArchitecture.pdf`
 - `openweights.pdf`
@@ -136,13 +140,22 @@ There is now also a separate agent-evaluation lane for turning the "how do we ev
 - runtime safety checks
 - document and multimodal agent evaluation
 
+There is now also an `LLMDevelopments.pdf` implementation lane for turning broad 2026 paper trends into production-scale experiments around:
+
+- retrieval strategy
+- context assembly
+- verifier loops
+- long-horizon CLI workflows
+- long-context systems prototypes
+
 ## Next Steps
 
 1. Convert `OpenCodingAgents.pdf` into a second note focused on local stack decisions, risks, and evaluation criteria.
 2. Flesh out `docs/architecture-advances-2026/`, `projects/architecture-advances-2026/`, and `evals/architecture-advances-2026/` into concrete prototype specs.
 3. Convert `Qwen3fromscratch.pdf` into a durable implementation note and drive a Qwen3 0.6B parity project from it.
 4. Build the new `docs/agent-evals/`, `projects/agent-evals/`, and `evals/agent-evals/` lane into runnable datasets, rubrics, and evaluators, with `projects/coding-agent-v1/` as the first integration target.
-5. Normalize PDF naming and move source files under `sources/pdfs/` once references are updated.
-6. Add an initial evaluation matrix for harnesses, models, permissions, and task success.
-7. Use `projects/coding-agent-from-scratch-implementation-map.md` as the bridge from the PDF concepts to a real codebase structure.
-8. Extend `projects/coding-agent-v1/` from single-bug repair into broader tasks like small feature work, safe renames, and richer session resume flows.
+5. Extend the `code/llm-developments-2026/` harness: it now runs retrieval, context, instruction, verifier, and test-time-scaling sweeps with scorecards and an adoption memo; still owed are long-horizon multi-step CLI chains, retrieval reranking, async handoff artifacts, and promotion of the winning defaults into `projects/coding-agent-v1/`.
+6. Normalize PDF naming and move source files under `sources/pdfs/` once references are updated.
+7. Add an initial evaluation matrix for harnesses, models, permissions, and task success.
+8. Use `projects/coding-agent-from-scratch-implementation-map.md` as the bridge from the PDF concepts to a real codebase structure.
+9. Extend `projects/coding-agent-v1/` from single-bug repair into broader tasks like small feature work, safe renames, and richer session resume flows.
