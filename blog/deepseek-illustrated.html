@@ -34,6 +34,10 @@ code { background:var(--code); padding:2px 6px; border-radius:5px; font-size:14p
 .callout strong { color:var(--accent); }
 .plain { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 18px; margin:16px 0; }
 .plain b { color:var(--accent); }
+table.cmp { border-collapse:collapse; width:100%; margin:20px 0; font-size:14px; }
+table.cmp th, table.cmp td { border:1px solid var(--line); padding:9px 12px; text-align:left; vertical-align:top; }
+table.cmp thead th { background:var(--code); }
+table.cmp td:first-child { font-weight:600; white-space:nowrap; color:var(--accent); }
 figure { margin:26px 0; padding:20px 20px 8px; background:var(--card); border:1px solid var(--line); border-radius:14px;
   box-shadow:0 1px 2px rgba(0,0,0,.03); }
 figure svg { width:100%; height:auto; display:block; }
@@ -333,6 +337,93 @@ keep the quality drop from sparsity <b>small</b> while getting big efficiency ga
 criterion is the quality-per-cost tradeoff — which is also why V3.2-Exp shipped first: to get the serving
 infrastructure ready for this non-standard attention.</div>
 
+<h3>DSA in depth: a cheap scout, then a careful read</h3>
+<p>The key structure is that DSA splits attention into <b>two steps</b>: a cheap scouting step that scores
+many past tokens, and a more expensive real-attention step that runs over only the few chosen ones.</p>
+
+<figure>
+<svg viewBox="0 0 760 220" role="img" aria-label="DSA two-stage: cheap scout then careful read">
+  <rect class="bxg" x="10" y="20" width="740" height="72" rx="12"/>
+  <text class="a" x="26" y="42">STAGE 1 · cheap scout — score ALL past tokens over MLA's compressed memory</text>
+  <circle cx="40"  cy="74" r="6" class="dot"/><circle cx="90"  cy="74" r="6" class="dot"/>
+  <circle cx="140" cy="74" r="6" class="dot"/><circle cx="190" cy="74" r="7" class="dotA"/>
+  <circle cx="240" cy="74" r="6" class="dot"/><circle cx="290" cy="74" r="6" class="dot"/>
+  <circle cx="340" cy="74" r="6" class="dot"/><circle cx="390" cy="74" r="6" class="dot"/>
+  <circle cx="440" cy="74" r="7" class="dotA"/><circle cx="490" cy="74" r="6" class="dot"/>
+  <circle cx="540" cy="74" r="6" class="dot"/><circle cx="590" cy="74" r="7" class="dotA"/>
+  <circle cx="640" cy="74" r="6" class="dot"/><circle cx="690" cy="74" r="6" class="dot"/>
+  <path class="ln" d="M380 92 V126"/><text class="a" x="392" y="116">keep top-k (k ≈ 2048)</text>
+  <rect class="bxa" x="10" y="130" width="740" height="80" rx="12"/>
+  <text class="a" x="26" y="152">STAGE 2 · careful read — full attention over ONLY the chosen few</text>
+  <rect class="bxd" x="620" y="169" width="110" height="34" rx="8"/><text class="w" x="675" y="191">new token</text>
+  <circle cx="120" cy="186" r="7" class="dotA"/><circle cx="300" cy="186" r="7" class="dotA"/><circle cx="470" cy="186" r="7" class="dotA"/>
+  <path class="ln" d="M616 182 H482"/>
+  <path class="ln" d="M616 188 H312"/>
+  <path class="ln" d="M616 194 H132"/>
+</svg>
+<figcaption><b>Scout, then read.</b> Stage 1 is cheap because it works over MLA's <b>compressed</b> notes — if
+the past memory were huge and raw, scoring everyone would be expensive. Stage 2 pays for real attention, but
+only over the handful that survived. So: <b>MLA gives a compressed memory of the past; DSA adds a learned
+retrieval mechanism on top of it.</b> That pairing is the real architecture story.</figcaption>
+</figure>
+
+<h3>Standard vs sliding window vs retrieval vs DSA</h3>
+<p>A sliding window assumes relevance is mostly <b>local</b> — recent tokens matter most. Useful, but crude.
+DSA drops that assumption: the most useful past token might be far back, so let the model learn to find it,
+wherever it sits.</p>
+
+<table class="cmp">
+<thead><tr><th>Style</th><th>What it reads</th><th>What it assumes</th><th>Cost</th></tr></thead>
+<tbody>
+<tr><td>Standard</td><td>every earlier token</td><td>anything might matter</td><td>O(L²)</td></tr>
+<tr><td>Sliding window</td><td>the last <i>w</i> tokens</td><td>recent = relevant</td><td>O(L·w)</td></tr>
+<tr><td>Retrieval (RAG)</td><td>top documents fetched from an <i>external</i> store</td><td>the answer lives outside the context</td><td>index + fetch</td></tr>
+<tr><td>DSA</td><td>a learned handful of the model's <i>own</i> past tokens</td><td>relevance can be anywhere — learn it</td><td>O(L·k), k ≪ L</td></tr>
+</tbody>
+</table>
+
+<figure>
+<svg viewBox="0 0 760 190" role="img" aria-label="Mental model: whole archive, last shelf, librarian">
+  <text class="ac" x="125" y="26">read the whole archive</text>
+  <g>
+    <rect class="bx" x="40" y="70" width="14" height="70"/><rect class="bx" x="58" y="70" width="14" height="70"/>
+    <rect class="bx" x="76" y="70" width="14" height="70"/><rect class="bx" x="94" y="70" width="14" height="70"/>
+    <rect class="bx" x="112" y="70" width="14" height="70"/><rect class="bx" x="130" y="70" width="14" height="70"/>
+    <rect class="bx" x="148" y="70" width="14" height="70"/><rect class="bx" x="166" y="70" width="14" height="70"/>
+    <rect class="bx" x="184" y="70" width="14" height="70"/><rect class="bx" x="202" y="70" width="14" height="70"/>
+  </g>
+  <text class="sc" x="128" y="160">standard attention</text>
+  <line x1="255" y1="20" x2="255" y2="170" class="lnq"/>
+
+  <text class="ac" x="380" y="26">read only the last shelf</text>
+  <g>
+    <rect class="bx" x="290" y="70" width="14" height="70" opacity="0.35"/><rect class="bx" x="308" y="70" width="14" height="70" opacity="0.35"/>
+    <rect class="bx" x="326" y="70" width="14" height="70" opacity="0.35"/><rect class="bx" x="344" y="70" width="14" height="70" opacity="0.35"/>
+    <rect class="bx" x="362" y="70" width="14" height="70" opacity="0.35"/><rect class="bx" x="380" y="70" width="14" height="70" opacity="0.35"/>
+    <rect class="bxa" x="416" y="70" width="14" height="70"/><rect class="bxa" x="434" y="70" width="14" height="70"/>
+    <rect class="bxa" x="452" y="70" width="14" height="70"/>
+  </g>
+  <text class="sc" x="378" y="160">sliding window</text>
+  <line x1="505" y1="20" x2="505" y2="170" class="lnq"/>
+
+  <text class="ac" x="632" y="26">a librarian pulls the few</text>
+  <circle cx="545" cy="96" r="12" class="bxd"/><text class="w" x="545" y="100" style="font-size:11px">L</text>
+  <rect class="bxg" x="530" y="126" width="210" height="12" rx="4"/>
+  <rect class="bxa" x="600" y="80" width="14" height="44"/><rect class="bxa" x="640" y="72" width="14" height="52"/>
+  <rect class="bxa" x="680" y="86" width="14" height="38"/>
+  <path class="ln" d="M562 96 C585 96 590 100 606 102"/>
+  <text class="sc" x="636" y="160">DSA</text>
+</svg>
+<figcaption><b>The cleanest picture.</b> Standard attention reads the whole archive every time. Sliding window
+reads only the last shelf. DSA uses a fast librarian to pull the most relevant old documents — near or far —
+and reads only those carefully.</figcaption>
+</figure>
+
+<p>The catch: this only works if the selector is good. If it misses an important old token, quality drops. So
+the whole design challenge is whether the model can <b>learn to choose the right sparse subset</b> — which is
+why Raschka frames DSA as an efficiency move whose success criterion is "less quality lost per unit of speed
+and cost saved."</p>
+
 <h2>4. DeepSeekMath V2 — the important side story</h2>
 <p>Raschka spends real time here, and it's not filler: it's a proof-of-concept for techniques that land in
 V3.2. Its setup has three roles — a <b>proof generator</b>, a <b>proof verifier</b>, and a <b>meta-verifier</b>.</p>
@@ -406,6 +497,70 @@ than it would invent on its own. Same student, but grown up under a strict grade
 <figcaption><b>Better answers cost more tokens.</b> More refinement iterations raise accuracy but raise cost —
 the classic inference-scaling trade. DeepSeek ran up to 8 iterations and accuracy hadn't saturated.</figcaption>
 </figure>
+
+<h3>The training loop, turn by turn</h3>
+<p>Put the three roles in motion. One training turn: the generator writes a proof; the verifier scores it
+against the rubric; the meta-verifier checks that the verifier judged fairly; the combined signal updates the
+models. Repeat.</p>
+
+<figure>
+<svg viewBox="0 0 760 250" role="img" aria-label="The generator-verifier-meta-verifier training loop, turn by turn">
+  <rect class="bxa" x="40"  y="24"  width="210" height="54" rx="10"/>
+  <text class="tc" x="145" y="47">1 · Generator</text><text class="sc" x="145" y="65">writes the proof</text>
+  <rect class="bx"  x="510" y="24"  width="210" height="54" rx="10"/>
+  <text class="tc" x="615" y="47">2 · Verifier</text><text class="sc" x="615" y="65">scores 0 / ½ / 1</text>
+  <rect class="bx"  x="510" y="170" width="210" height="54" rx="10"/>
+  <text class="tc" x="615" y="193">3 · Meta-verifier</text><text class="sc" x="615" y="211">checks the verifier</text>
+  <rect class="bxg" x="40"  y="170" width="210" height="54" rx="10"/>
+  <text class="tc" x="145" y="193">4 · signal updates</text><text class="sc" x="145" y="211">generator + verifier</text>
+
+  <path class="ln" d="M252 51 H506"/><text class="sc" x="378" y="42">proof</text>
+  <path class="ln" d="M615 80 V166"/><text class="s" x="624" y="128">is the score fair?</text>
+  <path class="ln" d="M508 197 H252"/><text class="sc" x="378" y="188">graded feedback</text>
+  <path class="ln" d="M145 168 V80"/><text class="s" x="60" y="128">learns</text>
+  <text class="sc" x="380" y="130">one training turn ⟳</text>
+</svg>
+<figcaption><b>The loop.</b> The structure changes the <b>training signal</b>. Without it, the generator learns
+from noisy criticism, the verifier drifts into overconfidence, and "self-refinement" becomes fake reflection.
+With it, the verifier is pushed to be a stronger critic, the meta-verifier keeps that critic accurate, and the
+generator improves under better judgment. The model isn't talking to itself — it's shaped by a stronger
+evaluation pipeline.</figcaption>
+</figure>
+
+<h3>Expensive where it matters, cheap where you scale</h3>
+
+<figure>
+<svg viewBox="0 0 760 210" role="img" aria-label="Three models during training, one model at inference">
+  <text class="a" x="20" y="24">TRAINING — pay where quality is set</text>
+  <rect class="bxa" x="30" y="36"  width="270" height="38" rx="8"/><text class="t" x="46" y="60">generator</text>
+  <rect class="bx"  x="30" y="82"  width="270" height="38" rx="8"/><text class="t" x="46" y="106">verifier</text>
+  <rect class="bx"  x="30" y="128" width="270" height="38" rx="8"/><text class="t" x="46" y="152">meta-verifier</text>
+  <text class="sc" x="165" y="188">3 models · the expensive part</text>
+
+  <line x1="380" y1="20" x2="380" y2="190" class="lnq"/>
+  <path class="ln" d="M300 100 H438"/>
+
+  <text class="a" x="410" y="24">INFERENCE — cheap where you scale</text>
+  <rect class="bxa" x="440" y="82" width="290" height="46" rx="10"/>
+  <text class="tc" x="585" y="103">one stronger model</text><text class="sc" x="585" y="120">does learned self-verify</text>
+  <text class="sc" x="585" y="188">1 model · generate → critique → revise</text>
+</svg>
+<figcaption><b>The payoff, and good system design.</b> You pay for three models <b>during training</b>, where
+quality is decided. At <b>inference</b> you often serve just one stronger model doing a trained version of
+self-verification — generate, critique, revise — with no second verifier in the loop every time.</figcaption>
+</figure>
+
+<div class="plain"><b>The education analogy.</b> Naive self-refinement is a student who writes an essay, grades
+it, and revises it — having never been taught by a strong teacher. DeepSeek's setup is a student who
+<b>writes</b>, a teacher who <b>critiques</b>, and a senior examiner who <b>checks the teacher</b>; the student
+revises under that supervision. After enough of this, the student can self-edit far better <b>alone</b>. At
+inference you get the graduated student, not the naive one — self-critique is a <i>reenacted learned behavior</i>,
+not something invented from scratch.</div>
+
+<div class="callout"><strong>Why it's powerful, in two lines.</strong> (1) <b>Better training signal</b> — the
+generator is rewarded in a structured environment (proof quality, verification correctness, revision quality),
+not for lucky answers. (2) <b>Cheaper inference</b> — once the verifier style is internalized, one model
+replaces the generator + verifier + meta-verifier stack.</div>
 
 <h2>6. The RL story — from R1 to V3.2</h2>
 <p>The continuity: still in the RLVR family, still using GRPO-style ideas. The change: reward design got wider
