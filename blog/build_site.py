@@ -52,6 +52,20 @@ def out_name(md_name: str) -> str:
     return "index.html" if md_name == "README.md" else md_name.replace(".md", ".html")
 
 
+# Sources are grouped topically (blog/llm-lab, blog/deepseek); the rendered site
+# stays flat, so pages are referenced by basename everywhere and only the disk
+# read needs to know the subfolder.
+_SRC_DIRS = ("", "llm-lab", "deepseek")
+
+
+def _src(name: str):
+    for sub in _SRC_DIRS:
+        p = BLOG_DIR / sub / name
+        if p.exists():
+            return p
+    return BLOG_DIR / name
+
+
 _NAME_MAP = {md: out_name(md) for md, _ in PAGES}
 
 
@@ -249,12 +263,12 @@ def build() -> None:
     SITE_DIR.mkdir(exist_ok=True)
     # Copy hand-authored rich HTML pages verbatim.
     for name, _ in EXTRA_HTML:
-        src = BLOG_DIR / name
+        src = _src(name)
         if src.exists():
             (SITE_DIR / name).write_text(src.read_text())
     navlinks_for = _navlinks
     for idx, (md, title) in enumerate(PAGES):
-        src = BLOG_DIR / md
+        src = _src(md)
         if not src.exists():
             continue
         body = markdown_to_html(src.read_text())

@@ -4,7 +4,7 @@
 *.jsonl
 
 # Large local model/parity artifacts
-code/qwen3-parity/artifacts/parity/
+topics/qwen3-from-scratch/code/artifacts/parity/
 
 # Local Python environments and caches
 .venv/
@@ -18,3 +18,6 @@ Thumbs.db
 
 # Generated blog site
 blog/site/
+
+# Python build metadata
+*.egg-info/
