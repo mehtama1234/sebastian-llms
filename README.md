@@ -97,6 +97,7 @@ As of Sunday, August 9, 2026, the current local test suite for `coding-agent-v1`
 - `projects/llm-developments-2026/`: project briefs for production experiments derived from `LLMDevelopments.pdf`
 - `evals/llm-developments-2026/`: benchmark plans for retrieval, context pressure, verifier loops, and long-horizon CLI tasks
 - `code/llm-developments-2026/`: the runnable experiment harness for those plans — retrieval/context/instruction/verifier/test-time-scaling sweeps, scorecards, and an auto-generated adoption memo (37 tests)
+- `blog/`: a plain-language blog series walking through the `llm-developments-2026` code and every experiment it runs
 - `evals/agent-evals/`: benchmark plans, rubrics, dataset notes, and scenario-pack shape for the agent-evaluation track
 - `code/qwen3-parity/`: implementation workspace for the reference-vs-scratch Qwen3 project
 

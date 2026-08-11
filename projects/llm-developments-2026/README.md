@@ -18,6 +18,7 @@ Runnable code:
 - `../../code/llm-developments-2026/` — the experiment harness (37 tests) that
   implements Targets A1–A3, B1–B3, C1–C2, and D1–D3
 - `./experiment-findings.md` — the committed adoption memo generated from the sweep
+- `../../blog/` — a plain-language blog series walking through the code and every experiment
 
 ## Goal
 
