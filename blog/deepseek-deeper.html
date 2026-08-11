@@ -286,6 +286,130 @@ degrades <b>gracefully</b> as sparsity tightens instead of failing catastrophica
 The defense is dedicated stress tests: needle-in-a-haystack, true long-range dependencies, and adversarial
 distractors — not just average accuracy.</div>
 
+<h2>Two toy training loops, with numbers</h2>
+<p>The diagrams above are the shapes. Here are two tiny worked examples with made-up numbers flowing through,
+so you can see what each loop actually does step by step.</p>
+
+<h3>Toy loop 1 · generator → verifier → meta-verifier</h3>
+<p>A math-proof example over two rounds. The generator's reward blends four things:
+<code>reward = correctness c + (meta-trust m × verifier score v) − penalty p + refine bonus</code>. The key move
+is that the meta-trust <b>m</b> scales the verifier's influence.</p>
+
+<figure>
+<svg viewBox="0 0 760 288" role="img" aria-label="Two-round generator-verifier-meta worked example">
+  <!-- round 1 -->
+  <text class="a" x="16" y="20">ROUND 1</text>
+  <rect class="bxa" x="16"  y="28" width="176" height="54" rx="10"/><text class="tc" x="104" y="50">Generator</text><text class="sc" x="104" y="70">proof v1</text>
+  <path class="ln" d="M192 55 H248"/>
+  <rect class="bx"  x="250" y="28" width="216" height="54" rx="10"/><text class="tc" x="358" y="50">Verifier → v = 0.5</text><text class="sc" x="358" y="70">"gap at step 3"</text>
+  <path class="ln" d="M466 55 H522"/>
+  <rect class="bx"  x="524" y="28" width="220" height="54" rx="10"/><text class="tc" x="634" y="50">Meta → m = 0.9</text><text class="sc" x="634" y="70">"critique is fair"</text>
+  <text class="s" x="16" y="104">reward₁ = 0 + (0.9 × 0.5) − 0.1 + 0  =  <tspan fill="#8a5a2b" font-weight="700">0.35</tspan></text>
+
+  <!-- revise -->
+  <path class="ln" d="M358 82 C340 128 120 118 104 156"/>
+  <text class="ac" x="150" y="128">revise ↺</text>
+
+  <!-- round 2 -->
+  <text class="a" x="16" y="150">ROUND 2</text>
+  <rect class="bxa" x="16"  y="158" width="176" height="54" rx="10"/><text class="tc" x="104" y="180">Generator</text><text class="sc" x="104" y="200">proof v2 · gap filled</text>
+  <path class="ln" d="M192 185 H248"/>
+  <rect class="bx"  x="250" y="158" width="216" height="54" rx="10"/><text class="tc" x="358" y="180">Verifier → v = 1.0</text><text class="sc" x="358" y="200">"rigorous"</text>
+  <path class="ln" d="M466 185 H522"/>
+  <rect class="bx"  x="524" y="158" width="220" height="54" rx="10"/><text class="tc" x="634" y="180">Meta → m = 0.95</text><text class="sc" x="634" y="200">"critique is fair"</text>
+  <text class="s" x="16" y="238">reward₂ = 1 + (0.95 × 1.0) − 0.1 + <tspan fill="#8a5a2b">0.5</tspan>  =  <tspan fill="#8a5a2b" font-weight="700">2.35</tspan></text>
+  <text class="sc" x="16" y="262">refine bonus 0.5 = the verifier score climbed 0.5 → 1.0 · reward jumps 0.35 → 2.35</text>
+</svg>
+<figcaption><b>Reward flows turn by turn.</b> Round 1 scores low and the critique drives a revision; round 2
+fills the gap, and the refine bonus explicitly pays for the <i>improvement</i> (not for writing more).</figcaption>
+</figure>
+
+<table class="cmp">
+<thead><tr><th>Round</th><th>c (final answer)</th><th>v (verifier)</th><th>m (meta-trust)</th><th>refine</th><th>penalty</th><th>reward = c + m·v − p + refine</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>0</td><td>0.5</td><td>0.9</td><td>0</td><td>0.1</td><td>0.35</td></tr>
+<tr><td>2</td><td>1</td><td>1.0</td><td>0.95</td><td>+0.5</td><td>0.1</td><td>2.35</td></tr>
+</tbody>
+</table>
+
+<div class="callout"><strong>m is a trust dial.</strong> Suppose in round 1 the verifier had over-praised a
+flawed proof with v = 1.0, but the meta-verifier smelled it and set m = 0.2. Then the verifier's contribution
+is only 0.2 × 1.0 = <b>0.2</b> instead of ~1.0 — the bogus praise is neutralized before it can corrupt the
+generator. That single multiply is why the meta-verifier is worth having.</div>
+
+<h3>Toy loop 2 · dense attention → sparse indexer (distillation)</h3>
+<p>One current token looking back at six past tokens. The <b>dense teacher</b> computes real attention weights
+over all six. The <b>indexer (student)</b> may only keep the top 2. Distillation trains the student's picks to
+land where the teacher put its mass. We measure "how much of the teacher's attention mass did the student's
+2 picks keep?"</p>
+
+<figure>
+<svg viewBox="0 0 760 344" role="img" aria-label="Distilling a sparse indexer from dense attention weights">
+  <!-- teacher row -->
+  <text class="a" x="16" y="40">TEACHER</text><text class="sc" x="16" y="58">dense weights</text>
+  <line x1="170" y1="110" x2="600" y2="110" stroke="#d8dee4"/>
+  <rect x="177" y="107" width="46" height="3"   class="bx"/>
+  <rect x="247" y="38"  width="46" height="72"  class="bxa"/>
+  <rect x="317" y="106" width="46" height="4"   class="bx"/>
+  <rect x="387" y="71"  width="46" height="39"  class="bxa"/>
+  <rect x="457" y="103" width="46" height="7"   class="bx"/>
+  <rect x="527" y="103" width="46" height="7"   class="bx"/>
+  <text class="sc" x="270" y="32">.55</text><text class="sc" x="410" y="64">.30</text>
+  <text class="s" x="612" y="112">mass in t2 + t4 = 0.85</text>
+
+  <!-- student before -->
+  <text class="a" x="16" y="150">STUDENT</text><text class="sc" x="16" y="168">before · scores</text>
+  <line x1="170" y1="205" x2="600" y2="205" stroke="#d8dee4"/>
+  <rect x="177" y="192" width="46" height="13" class="bx"/>
+  <rect x="247" y="179" width="46" height="26" class="bx"/>
+  <rect x="317" y="127" width="46" height="78" class="bx" stroke="#8a5a2b"/>
+  <rect x="387" y="192" width="46" height="13" class="bx"/>
+  <rect x="457" y="166" width="46" height="39" class="bx" stroke="#8a5a2b"/>
+  <rect x="527" y="192" width="46" height="13" class="bx"/>
+  <circle cx="340" cy="119" r="6" fill="none" stroke="#8a5a2b" stroke-width="2"/>
+  <circle cx="480" cy="158" r="6" fill="none" stroke="#8a5a2b" stroke-width="2"/>
+  <text class="s" x="612" y="207" fill="#b4443a">picks t3,t5 → keeps 0.08 ✗</text>
+
+  <!-- student after -->
+  <text class="a" x="16" y="245">STUDENT</text><text class="sc" x="16" y="263">after · scores</text>
+  <line x1="170" y1="300" x2="600" y2="300" stroke="#d8dee4"/>
+  <rect x="177" y="293" width="46" height="7"  class="bx"/>
+  <rect x="247" y="235" width="46" height="65" class="bxa"/>
+  <rect x="317" y="293" width="46" height="7"  class="bx"/>
+  <rect x="387" y="254" width="46" height="46" class="bxa"/>
+  <rect x="457" y="296" width="46" height="4"  class="bx"/>
+  <rect x="527" y="297" width="46" height="3"  class="bx"/>
+  <circle cx="270" cy="227" r="6" fill="none" stroke="#8a5a2b" stroke-width="2"/>
+  <circle cx="410" cy="246" r="6" fill="none" stroke="#8a5a2b" stroke-width="2"/>
+  <text class="s" x="612" y="302">picks t2,t4 → keeps 0.85 ✓</text>
+
+  <!-- distill arrow -->
+  <path class="ln" d="M110 212 V292"/><text class="ac" x="70" y="258" transform="rotate(-90 70 258)">distill</text>
+
+  <!-- x labels -->
+  <text class="sc" x="200" y="332">t1</text><text class="sc" x="270" y="332">t2</text>
+  <text class="sc" x="340" y="332">t3</text><text class="sc" x="410" y="332">t4</text>
+  <text class="sc" x="480" y="332">t5</text><text class="sc" x="550" y="332">t6</text>
+</svg>
+<figcaption><b>Compress the oracle into a policy.</b> The student starts by ranking t3 and t5 highest — the
+wrong tokens — so its 2 picks keep only 0.08 of the teacher's mass. Distillation reshapes its scores toward the
+teacher, so it now picks t2 and t4 and keeps 0.85. There was never a label saying "t2 and t4 are right"; the
+teacher's own attention <i>is</i> the target.</figcaption>
+</figure>
+
+<table class="cmp">
+<thead><tr><th>Row</th><th>t1</th><th>t2</th><th>t3</th><th>t4</th><th>t5</th><th>t6</th><th>top-2 picks</th><th>teacher mass kept</th></tr></thead>
+<tbody>
+<tr><td>Teacher (dense weights)</td><td>.02</td><td>.55</td><td>.03</td><td>.30</td><td>.05</td><td>.05</td><td>t2, t4</td><td>0.85 (ceiling)</td></tr>
+<tr><td>Student before (scores)</td><td>.10</td><td>.20</td><td>.60</td><td>.10</td><td>.30</td><td>.10</td><td>t3, t5</td><td>0.08</td></tr>
+<tr><td>Student after (scores)</td><td>.05</td><td>.50</td><td>.05</td><td>.35</td><td>.03</td><td>.02</td><td>t2, t4</td><td>0.85</td></tr>
+</tbody>
+</table>
+<p>"Mass kept" is the teacher's attention weight on whatever positions the student picked. Top-2 can capture at
+most 0.85 here, so the trained student (0.85) recovers <b>all</b> of the recoverable mass while the untrained one
+(0.08) recovers almost none — and in practice you'd still keep a local-window fallback so a bad pick can't erase
+the recent context entirely.</p>
+
 <h2>Clean summary</h2>
 <div class="plain">
 <b>Verifier stack:</b> generator solves → verifier scores and critiques → meta-verifier audits the verifier →
