@@ -16,6 +16,11 @@ dependencies = [
 llm-dev-experiment = "llm_dev_2026.cli:main"
 llm-dev-scorecard = "llm_dev_2026.scorecard_cli:main"
 llm-dev-memo = "llm_dev_2026.memo_cli:main"
+llm-dev-real-benchmark = "llm_dev_2026.real_benchmark_cli:main"
+llm-dev-real-task = "llm_dev_2026.real_task_cli:main"
+llm-dev-real-task-verify = "llm_dev_2026.real_task_verify_cli:main"
+llm-dev-real-experiment = "llm_dev_2026.real_experiment_cli:main"
+llm-dev-real-policy-experiment = "llm_dev_2026.real_policy_experiment_cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

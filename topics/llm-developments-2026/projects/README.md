@@ -12,6 +12,7 @@ Canonical docs:
 - `./implementation-roadmap.md`
 - `./meaty-end-to-end-goal.md`
 - `./detailed-implementation-targets.md`
+- `./production-scale-real-experiment-checklist.md`
 
 Runnable code:
 
@@ -42,6 +43,13 @@ This track is successful when the repo contains:
 - Hierarchical repo instructions unlock guidance-gated tasks (67% → 83%) at ~35 tokens/task.
 - A grounding verifier removes shipped hallucinations (17% → 0%) by escalating instead of bluffing.
 - Multi-attempt / retry recovers flaky-recall tasks (67% → 75%); the stacked production candidate reaches 100% honest success at higher latency.
+
+## Real benchmark update (Wednesday, August 12, 2026)
+
+- The widened 15-task real-task sample now recommends `lexical` as the pooled retrieval default.
+- That recommendation is based on the retrieval-only real benchmark memo in `../code/artifacts/reports/real-retrieval-policy-memo.md` and the slice breakdown in `../code/artifacts/reports/real-retrieval-slice-report.md`.
+- On the widened sample benchmark, `lexical` reached the best accepted rate (`0.933`) and stayed fully grounded (`1.000`), while `sparse` dropped to `0.867` and `task_aware` to `0.733`.
+- The slice report shows the pooled default hides real structure: `lexical` is best on `inspect` and short-context work, `task_aware` is now best on the enlarged 5-task `diagnose` slice, and `sparse` stays the best long-context / research default because it preserves acceptance while cutting cost.
 
 See `experiment-findings.md` for the full memo. Numbers test policy *direction*, not absolute production quality.
 

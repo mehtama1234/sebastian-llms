@@ -10,6 +10,7 @@ Canonical docs:
 
 - `../../docs/architecture-advances-2026/README.md`
 - `./meaty-end-to-end-goal.md`
+- `./indexer-vs-attention-goal.md`
 
 ## Goal
 
@@ -43,6 +44,7 @@ In plain terms: this track should end as an architecture experimentation platfor
 3. `per-layer-embeddings-prototype`
 4. `compressed-attention-prototype`
 5. `deepseek-v4-inspired-prototypes`
+6. `indexer-vs-attention`
 
 ## Delivery rule
 

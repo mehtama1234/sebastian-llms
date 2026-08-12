@@ -43,6 +43,17 @@ decisive and testable.
 ```
 src/llm_dev_2026/
   config.py        HarnessConfig — the serializable policy space
+  benchmark_schema.py typed real-task benchmark schema
+  benchmark_loader.py versioned benchmark manifest loader
+  task_pack.py     task slicing by repo / class / difficulty / long-context
+  provider.py      provider interface plus deterministic local and OpenAI-backed providers
+  real_retrieval.py lexical, sparse, and task-aware repo-chunk retrieval over real workspace files
+  runtime.py       real-task attempt artifact builder with gold-span or retrieval-backed context
+  real_benchmark_runtime.py local readiness audit for real benchmark tasks
+  real_task_verifier.py verifier/meta-verifier scoring over real-task attempt artifacts
+  real_scorecard.py aggregate scorecards over verified real-task runs
+  real_experiment.py real-manifest experiment runner and report builder
+  real_policy_experiment.py comparative real-task policy matrix and scorecard deltas
   text.py          tokenizer, IDF, concept-space embedding
   corpus.py        synthetic repo + scenario pack (evidence placement, difficulty)
   retrieval.py     lexical / vector / hybrid / sparse retrieval + ops accounting
@@ -55,18 +66,26 @@ src/llm_dev_2026/
   scorecard.py     production scorecards + directional comparison
   experiment.py    the default config matrix + comparison plan
   memo.py          rule-based adoption decisions
-  cli.py / scorecard_cli.py / memo_cli.py
+  cli.py / scorecard_cli.py / memo_cli.py / real_benchmark_cli.py / real_task_cli.py / real_task_verify_cli.py / real_experiment_cli.py / real_policy_experiment_cli.py
 ```
 
 ## Run it
 
 ```bash
 python -m venv .venv && .venv/bin/pip install numpy pytest
-.venv/bin/python -m pytest -q                      # 37 tests
+.venv/bin/python -m pytest -q                      # 77 tests
 
 .venv/bin/python -m llm_dev_2026.cli               # scorecard table + comparisons
 .venv/bin/python -m llm_dev_2026.scorecard_cli     # scorecards only
 .venv/bin/python -m llm_dev_2026.memo_cli          # adoption memo (markdown)
+.venv/bin/python -m llm_dev_2026.real_benchmark_cli ../evals/datasets/real-repos/sample-benchmark.json
+.venv/bin/python -m llm_dev_2026.real_task_cli ../evals/datasets/real-repos/sample-benchmark.json topics.inspect.deepseek_architecture_lane
+.venv/bin/python -m llm_dev_2026.real_task_cli ../evals/datasets/real-repos/sample-benchmark.json topics.inspect.deepseek_architecture_lane --provider openai --model gpt-5.6
+.venv/bin/python -m llm_dev_2026.real_task_verify_cli ../evals/datasets/real-repos/sample-benchmark.json topics.inspect.deepseek_architecture_lane --skip-validation
+.venv/bin/python -m llm_dev_2026.real_experiment_cli ../evals/datasets/real-repos/sample-benchmark.json --provider local --evidence-source retrieval --retrieval-mode lexical --skip-validation
+.venv/bin/python -m llm_dev_2026.real_policy_experiment_cli ../evals/datasets/real-repos/sample-benchmark.json --quiet
+.venv/bin/python -m llm_dev_2026.real_policy_memo ../evals/datasets/real-repos/sample-benchmark.json --artifact-md artifacts/reports/real-retrieval-policy-memo.md
+.venv/bin/python -m llm_dev_2026.real_retrieval_slice_report ../evals/datasets/real-repos/sample-benchmark.json --artifact-md artifacts/reports/real-retrieval-slice-report.md
 .venv/bin/python -m llm_dev_2026.cli --out artifacts/report.json
 ```
 
@@ -75,8 +94,13 @@ python -m venv .venv && .venv/bin/pip install numpy pytest
 - **Implemented now:** A1 retrieval adapter, A2 context assembly + pressure, A3
   repo-instruction loading, B1 multi-attempt planning, B2 verifier layer, B3
   stop/retry/escalate policy, C1 harness schema, C2 task-class labels, D1 CLI
-  scenario pack, D2 stage-level evaluation, D3 production scorecards.
-- **Next:** A1 reranking, C3 async handoff artifacts, E cache/compression
+  scenario pack, D2 stage-level evaluation, D3 production scorecards, the
+  first Workstream 1 scaffold for real benchmark manifests, and a real-task
+  runtime/provider seam that emits attempt artifacts from local evidence or an
+  OpenAI-backed Responses API provider and scores them through verifier plus meta-verifier, then aggregates them into real-task scorecards and compares gold-span, lexical-retrieval, sparse-retrieval, and task-aware-retrieval variants.
+
+As of Wednesday, August 12, 2026, the widened 15-task real benchmark sample recommends `lexical` as the pooled real-task retrieval default. The supporting artifacts are `artifacts/reports/real-retrieval-policy-memo.md` and `artifacts/reports/real-retrieval-slice-report.md`.
+- **Next:** expand the manifest beyond the sample pack, widen the comparative matrix beyond instruction/validation/retrieval variants, add stronger reranking and retrieval diagnostics, and then run real benchmark execution over live repos at useful scale.
   simulators (some already prototyped in `architecture-advances-2026`), F/G
   promotion into `projects/coding-agent-v1/` once the winning defaults are locked.
 

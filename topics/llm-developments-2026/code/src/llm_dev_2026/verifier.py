@@ -63,6 +63,9 @@ def verify(attempt: Attempt, *, threshold: float = 0.5) -> VerifierOutcome:
         "recall_flaky": 0.32,
         "context_drop": 0.28,
         "missing_guidance": 0.12,
+        "missing_paths": 0.05,
+        "runtime_ungrounded": 0.22,
+        "validation_failed": 0.1,
     }
     score = score_map.get(attempt.stage, 0.2)
     confidence = 0.55 + min(0.35, 0.04 * len(attempt.doc_ids))

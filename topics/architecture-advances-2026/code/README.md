@@ -168,6 +168,54 @@ Run a same-cases variant proxy comparison across the Qwen-shaped config family:
 
 This writes `artifacts/long_context/qwen3_variant_proxy_compare.json`. Unlike the real Hugging Face sweep, this is a proxy comparison surface: it holds the synthetic retrieval cases fixed and scores each architecture config with a deterministic architecture-aware proxy so you can compare likely quality-vs-memory directionality across variants before retraining work exists.
 
+Run a synthetic indexer-vs-attention comparison that contrasts chunk-selection strategies against budgeted context behavior:
+
+```bash
+./scripts/run_indexer_vs_attention.sh
+```
+
+This writes:
+
+- `artifacts/long_context/indexer_vs_attention.json`
+- `artifacts/long_context/indexer_vs_attention.md`
+
+The surface is intentionally simple. It gives you one controlled matrix where you can compare:
+
+- naive early-context inclusion
+- window-plus-anchor retention
+- sparse lexical indexing
+- sparse mixed indexing
+- a compressed-attention-style reference ordering
+
+Turn that report into an explicit recommendation artifact:
+
+```bash
+./scripts/run_indexer_vs_attention_selector.sh
+```
+
+This writes `artifacts/long_context/indexer_vs_attention_selector.json` with carry-forward picks for:
+
+- the tightest budget
+- a medium budget
+- the harder multi-hop and verifier-style subset
+
+Run the same budgeted comparison on the real benchmark manifest instead of the synthetic case pack:
+
+```bash
+./scripts/run_real_indexer_vs_attention.sh
+```
+
+This writes:
+
+- `artifacts/long_context/real_indexer_vs_attention.json`
+- `artifacts/long_context/real_indexer_vs_attention.md`
+
+This bridge reuses the `llm-developments-2026` sample real-task benchmark and measures a simpler question than full task success:
+
+- which gold evidence paths survive under budget
+- how lexical order, sparse order, and structured reranking differ
+- how much prompt payload each strategy spends
+
 Render a compact markdown decision layer over that artifact:
 
 ```bash
