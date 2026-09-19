@@ -5,6 +5,7 @@ from uuid import uuid4
 import subprocess
 import shlex
 import json
+import os
 import re
 
 from .models import (
@@ -434,12 +435,13 @@ def _build_model_guided_task_plan(
 
 def _run_model_planner_command(command: str, payload: dict[str, object]) -> dict[str, object]:
     try:
+        timeout_seconds = float(os.environ.get("CODING_AGENT_V1_MODEL_PLANNER_TIMEOUT_SECONDS", "20"))
         completed = subprocess.run(
             shlex.split(command),
             input=json.dumps(payload),
             text=True,
             capture_output=True,
-            timeout=20,
+            timeout=timeout_seconds,
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -701,6 +703,14 @@ def _select_task_flow(
             reason=failure_report_reason(referenced_tests),
         )
 
+    if "run" in lowered and "test" in lowered and "report" in lowered:
+        append_task_flow_candidate(
+            scored_candidates,
+            task_flow=TaskFlow.DIAGNOSE,
+            score=10,
+            priority=2,
+            reason="diagnose evidence: request asks to run tests and report the result",
+        )
     if looks_like_inspect_request(lowered):
         inspect_score = 6
         if instruction_files:
@@ -824,6 +834,7 @@ def _extract_pattern(request: str) -> str:
 def _extract_rename_request(request: str) -> tuple[str, str] | None:
     patterns = [
         r"\brename\s+([A-Za-z_][A-Za-z0-9_]*)\s+to\s+([A-Za-z_][A-Za-z0-9_]*)\b",
+        r"\brename\s+(?:the\s+)?([A-Za-z_][A-Za-z0-9_]*)\s+function\s+to\s+([A-Za-z_][A-Za-z0-9_]*)\b",
         r"\brename\s+([A-Za-z_][A-Za-z0-9_]*)\s*->\s*([A-Za-z_][A-Za-z0-9_]*)\b",
     ]
     for pattern in patterns:

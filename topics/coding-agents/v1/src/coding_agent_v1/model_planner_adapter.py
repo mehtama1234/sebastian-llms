@@ -12,6 +12,7 @@ from .models import TaskFlow
 
 
 MODEL_COMMAND_ENV = "CODING_AGENT_V1_MODEL_COMMAND"
+MODEL_TIMEOUT_ENV = "CODING_AGENT_V1_MODEL_TIMEOUT_SECONDS"
 
 
 class ModelPlannerAdapterError(ValueError):
@@ -129,7 +130,7 @@ def run_model_planner_adapter(payload: dict[str, Any], model_command: str) -> di
             input=prompt,
             text=True,
             capture_output=True,
-            timeout=60,
+            timeout=float(os.environ.get(MODEL_TIMEOUT_ENV, "60")),
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:

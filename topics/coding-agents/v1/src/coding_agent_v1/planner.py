@@ -511,6 +511,7 @@ def extract_generic_env_var_request(request: str) -> tuple[str, str, str] | None
         r"\badd ([A-Z_][A-Z0-9_]*) with default ([A-Za-z0-9_.'\"-]+)\b",
         r"\bset ([A-Z_][A-Z0-9_]*) default to ([A-Za-z0-9_.'\"-]+)\b",
         r"\bmake (?:the )?(?:config|settings|options)\s+(?:read|use|load)\s+([A-Za-z_][A-Za-z0-9_]*)\s+from\s+([A-Z_][A-Z0-9_]*)\s+with default ([A-Za-z0-9_.'\"-]+)\b",
+        r"\b([A-Za-z_][A-Za-z0-9_]*)\s+should come from\s+([A-Z_][A-Z0-9_]*),?\s+with ([A-Za-z0-9_.'\"-]+) as (?:the )?(?:fallback|default)\b",
     ]
     for pattern in patterns:
         match = re.search(pattern, request, flags=re.IGNORECASE)
