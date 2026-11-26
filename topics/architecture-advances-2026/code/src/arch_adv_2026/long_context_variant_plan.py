@@ -13,6 +13,11 @@ EXECUTION_MODE_SUMMARY_ONLY = "summary_only"
 QWEN3_COMPRESSED_ATTENTION_CONFIG_ENV = "ARCH_ADV_QWEN3_COMPRESSED_ATTENTION_CONFIG"
 
 
+def _path_text(path: str | Path) -> str:
+    """Use stable slash-separated paths in portable JSON artifacts."""
+    return Path(path).as_posix()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Resolve a long-context variant proxy selector into a concrete focused follow-up plan."
@@ -198,8 +203,8 @@ def build_variant_run_plan(
 
     return {
         "workflow": "long_context_variant_proxy",
-        "selector_artifact_path": str(selector_artifact_path),
-        "source_compare_artifact_path": str(resolved_compare_artifact_path),
+        "selector_artifact_path": _path_text(selector_artifact_path),
+        "source_compare_artifact_path": _path_text(resolved_compare_artifact_path),
         "source_compare_artifact_exists": compare_artifact_exists,
         "objective": objective,
         "config_family": config_family,
@@ -207,14 +212,14 @@ def build_variant_run_plan(
         "selection_policy": selector_artifact["selection_policy"],
         "selected_recommendation": recommendation,
         "selected_variant_kind": recommendation["variant_kind"],
-        "selected_config_path": str(selected_config_path),
-        "baseline_config_path": str(baseline_config_path),
-        "planned_selected_summary_artifact_path": str(selected_summary_artifact_path),
-        "planned_baseline_summary_artifact_path": str(baseline_summary_artifact_path),
-        "planned_focused_compare_artifact_path": str(focused_compare_artifact_path),
-        "planned_focused_report_artifact_path": str(focused_report_artifact_path),
-        "planned_execution_artifact_path": str(execution_artifact_path),
-        "planned_plan_artifact_path": str(plan_artifact_path),
+        "selected_config_path": _path_text(selected_config_path),
+        "baseline_config_path": _path_text(baseline_config_path),
+        "planned_selected_summary_artifact_path": _path_text(selected_summary_artifact_path),
+        "planned_baseline_summary_artifact_path": _path_text(baseline_summary_artifact_path),
+        "planned_focused_compare_artifact_path": _path_text(focused_compare_artifact_path),
+        "planned_focused_report_artifact_path": _path_text(focused_report_artifact_path),
+        "planned_execution_artifact_path": _path_text(execution_artifact_path),
+        "planned_plan_artifact_path": _path_text(plan_artifact_path),
         "focused_compare_params": (
             _focused_compare_params(compare_artifact, objective) if compare_artifact is not None else None
         ),

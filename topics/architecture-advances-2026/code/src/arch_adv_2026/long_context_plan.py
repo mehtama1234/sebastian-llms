@@ -21,6 +21,11 @@ BENCHMARK_MODE_TORCH_PROXY = "torch_proxy"
 BENCHMARK_MODE_SUMMARY_ONLY = "summary_only"
 
 
+def _path_text(path: str | Path) -> str:
+    """Use stable slash-separated paths in portable JSON artifacts."""
+    return Path(path).as_posix()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Resolve a long-context selector artifact into a concrete config-backed run plan."
@@ -130,11 +135,11 @@ def build_run_plan(
         "selector_policy": selector_artifact["selection_policy"],
         "selected_recommendation": recommendation,
         "selected_variant_kind": recommendation["variant_kind"],
-        "selected_config_path": str(config_path),
-        "baseline_config_path": str(baseline_config_path),
-        "planned_summary_artifact_path": str(summary_artifact_path),
-        "planned_benchmark_artifact_path": str(benchmark_artifact_path),
-        "planned_plan_artifact_path": str(plan_artifact_path),
+        "selected_config_path": _path_text(config_path),
+        "baseline_config_path": _path_text(baseline_config_path),
+        "planned_summary_artifact_path": _path_text(summary_artifact_path),
+        "planned_benchmark_artifact_path": _path_text(benchmark_artifact_path),
+        "planned_plan_artifact_path": _path_text(plan_artifact_path),
         "benchmark_mode": benchmark_mode,
         "benchmark_params": {
             "config_family": "micro",

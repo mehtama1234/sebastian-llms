@@ -44,6 +44,7 @@ def _dedupe_snippets(snippets: list[EvidenceSnippet]) -> list[EvidenceSnippet]:
     deduped: list[EvidenceSnippet] = []
     seen: set[str] = set()
     for snippet in snippets:
+        snippet.path = snippet.path.replace("\\", "/")
         key = f"{snippet.path}:{snippet.start_line}:{snippet.end_line}"
         if key in seen:
             continue
@@ -249,7 +250,7 @@ def _iter_entrypoint_candidates(repo_root: Path, area_prefixes: list[str], task_
         if not root.exists():
             continue
         for path in root.rglob("*.py"):
-            rel_path = str(path.relative_to(repo_root))
+            rel_path = path.relative_to(repo_root).as_posix()
             normalized = rel_path.lower()
             if task_class == "inspect":
                 keep = normalized.endswith("eval.py") or normalized.endswith("assessment.py")
